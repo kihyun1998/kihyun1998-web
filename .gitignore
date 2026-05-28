@@ -44,3 +44,4 @@ next-env.d.ts
 
 # local screenshots / scratch (verification + reference captures)
 /*-home*.png
+.mcp.json
