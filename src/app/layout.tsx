@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { LanguageProvider } from '@/components/language';
+import { SiteHeader } from '@/components/site-header';
+import { SiteFooter } from '@/components/site-footer';
 import './globals.css';
 
 // Inter is self-hosted by next/font and exposed as --font-inter, which
@@ -57,7 +59,13 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
-        <LanguageProvider>{children}</LanguageProvider>
+        <LanguageProvider>
+          <main className="mx-auto max-w-2xl px-6 py-24 sm:py-32">
+            <SiteHeader />
+            {children}
+            <SiteFooter />
+          </main>
+        </LanguageProvider>
       </body>
     </html>
   );

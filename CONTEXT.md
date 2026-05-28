@@ -49,7 +49,8 @@ _Avoid_: i18n (too generic), multilingual (implies parity that does not exist)
 - Each **Package** card displays exactly two pieces of data: its name and its **Ecosystem** tag. No description, no year, no star count, no status indicator. See [[adr-0003-minimal-project-card]].
 - The "Open Source" list orders **Package**s by curation (most-promoted first) within natural **Ecosystem** clusters — no explicit per-Ecosystem headers; the clustering emerges from sort order.
 - Each **Project** card currently displays just its name (linking to its **canonical destination**). Its additional metadata (live URL vs. repo, a kind label) is deferred — to be decided later.
-- The site has one primary page (the home): a brief identity statement at the top, then the "Open Source" section, then the "Projects" section. **Blog** appears only as one outbound link in the nav area — it is not a section of its own.
+- The home page shows a *curated, capped* subset of each section (currently up to 6). When a section overflows, a "See all" link points to its full-list page (`/open-source`, `/projects`), which renders the entire curated array — not the raw GitHub account. See [[adr-0005-curated-home-full-pages]].
+- The home page is: a brief identity statement at the top, then the "Open Source" section, then the "Projects" section. **Blog** appears only as one outbound link in the nav area — it is not a section of its own.
 - The nav area holds exactly two outbound links — **Blog** (`https://blog.kihyun1998.com`) and GitHub profile (`https://github.com/kihyun1998`) — plus the **Language Toggle** and a theme toggle. No Twitter, LinkedIn, or email link; anyone needing contact finds it on the GitHub profile.
 
 ## Flagged ambiguities

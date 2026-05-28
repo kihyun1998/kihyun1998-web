@@ -24,6 +24,8 @@ export const packages: Package[] = [
   { name: 'flutter_folderview', ecosystem: 'Flutter', href: 'https://github.com/kihyun1998/flutter_folderview' },
   { name: 'just_color_picker', ecosystem: 'Flutter', href: 'https://github.com/kihyun1998/just_color_picker' },
   { name: 'flutter_ime', ecosystem: 'Flutter', href: 'https://github.com/kihyun1998/flutter_ime' },
+  { name: 'flutter_inactive_timer', ecosystem: 'Flutter', href: 'https://github.com/kihyun1998/flutter_inactive_timer' },
+  { name: 'x509_cert_store', ecosystem: 'Flutter', href: 'https://github.com/kihyun1998/x509_cert_store' },
   { name: 'justpdf', ecosystem: 'Rust', href: 'https://github.com/kihyun1998/justpdf' },
   { name: 'justjp2', ecosystem: 'Rust', href: 'https://github.com/kihyun1998/justjp2' },
 ];

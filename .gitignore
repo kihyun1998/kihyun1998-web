@@ -43,5 +43,6 @@ next-env.d.ts
 .playwright-mcp
 
 # local screenshots / scratch (verification + reference captures)
-/*-home*.png
+# root-level PNGs only — assets under /public are unaffected
+/*.png
 .mcp.json
