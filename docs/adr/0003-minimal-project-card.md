@@ -3,7 +3,9 @@ name: adr-0003-minimal-project-card
 status: accepted
 ---
 
-# Project card shows only name and Ecosystem
+> **Terminology note:** This ADR predates [[adr-0004-open-source-vs-projects]], which split "Project" into **Package** (Open Source) and **Project** (services). Everywhere below, "Project card" means **Package card** — the items in the Open Source section.
+
+# Package card shows only name and Ecosystem
 
 Every reference site we looked at (paco.me, leerob.com, rauchg.com) carries a one-line description per Project. We chose to omit that field entirely.
 

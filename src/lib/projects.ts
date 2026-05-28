@@ -1,27 +1,23 @@
-// The Open Source list. See CONTEXT.md ("Project", "Ecosystem") and
-// docs/adr/0003-minimal-project-card.md.
+// The "Projects" section — standalone services/apps that a person uses directly
+// (not building blocks). See CONTEXT.md ("Project") and
+// docs/adr/0004-open-source-vs-projects.md.
 //
-// Rules locked in during the design grill:
-// - Hand-curated, not auto-pulled from GitHub. Only things worth showing.
-// - A card shows exactly two things: `name` and `ecosystem`. No description.
-// - Clicking a card goes to `href` — always the canonical GitHub repo.
-// - Order is by curation within natural ecosystem clusters: the clustering
-//   emerges from the order of this array, there are no per-ecosystem headers.
-//   Put the project you most want seen first within each cluster.
-
-export type Ecosystem = 'Flutter' | 'Rust' | 'TypeScript';
+// Rules:
+// - Hand-curated.
+// - A card currently shows just `name`, linking to `href` (its canonical
+//   destination). Extra metadata (live URL vs repo, a kind label) is DEFERRED —
+//   to be decided later, per the design grill.
 
 export type Project = {
   name: string;
-  ecosystem: Ecosystem;
+  // Canonical destination. For a deployed service this should eventually be the
+  // live URL; for now it points at the GitHub repo. TODO(kihyun): decide.
   href: string;
 };
 
-// TODO(kihyun): replace these placeholders with your real curated projects,
-// in the order you want them shown.
+// Example data — real repos, selection/order are placeholders.
+// TODO(kihyun): finalize which projects to show, their order, and href targets.
 export const projects: Project[] = [
-  { name: 'example-flutter-widgets', ecosystem: 'Flutter', href: 'https://github.com/kihyun1998/example-flutter-widgets' },
-  { name: 'example-flutter-pkg', ecosystem: 'Flutter', href: 'https://github.com/kihyun1998/example-flutter-pkg' },
-  { name: 'example-rust-cli', ecosystem: 'Rust', href: 'https://github.com/kihyun1998/example-rust-cli' },
-  { name: 'example-ts-lib', ecosystem: 'TypeScript', href: 'https://github.com/kihyun1998/example-ts-lib' },
+  { name: 'youtube-comment-exporter', href: 'https://github.com/kihyun1998/youtube-comment-exporter' },
+  { name: 'video-to-subtitle', href: 'https://github.com/kihyun1998/video-to-subtitle' },
 ];

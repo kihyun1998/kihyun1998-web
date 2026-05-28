@@ -8,19 +8,23 @@ A personal site for Ki Hyun Park. Acts as a public index pointing to his blog (h
 A personal writing destination hosted *outside* this site. kihyun1998.com references it via a single outbound link; it does not host or render blog posts.
 _Avoid_: writing, posts, journal (all imply content lives here)
 
+**Package**:
+A reusable open-source library, plugin, or crate authored by Kihyun — something another developer *installs and builds on top of* (via pub.dev, crates.io, npm, etc.). Its value is in being a building block. Shown in the "Open Source" section. Hand-curated, not auto-pulled from GitHub. See [[adr-0004-open-source-vs-projects]].
+_Avoid_: repo (a Package may span multiple repos), library (too narrow — some are plugins or codecs), project (a Package is NOT a Project — see below)
+
 **Project**:
-A piece of open-source software authored by Kihyun and worth showing publicly. The list is *hand-curated* (not auto-pulled from GitHub) — only things he wants visitors to see. Spans multiple ecosystems (Flutter, npm, Rust, etc.); a Project is defined by its identity, not its language.
-_Avoid_: repo (a Project may live across multiple repos), package (not every Project is published to a registry yet), library (too narrow — some Projects are apps or CLIs)
+A standalone service or application authored by Kihyun that a person *uses directly* — not a building block, but a finished thing you run (a web service, a browser extension, a tool). Conceptually a "service"; displayed under the label "Projects". Hand-curated. See [[adr-0004-open-source-vs-projects]].
+_Avoid_: package/library (those are the building-block category, i.e. **Package**), app (too narrow — some are services, not apps)
 
 **Ecosystem**:
-A short tag (e.g. `Flutter`, `TypeScript`, `Rust`) that signals the runtime/framework context of a Project to a browsing developer. Chosen for *informativeness* over consistency — pick the tag that most quickly tells a passing developer "this is relevant to me." It is metadata on a Project, not a grouping mechanism unless explicitly chosen to be.
+A short tag (e.g. `Flutter`, `TypeScript`, `Rust`) that signals the runtime/framework context of a **Package** to a browsing developer. Chosen for *informativeness* over consistency — pick the tag that most quickly tells a passing developer "this is relevant to me." It is metadata on a Package. (Projects do not currently carry an Ecosystem tag — their metadata is deferred.)
 _Avoid_: language (overlaps but isn't the same — "Flutter" is more useful than "Dart"), stack, tech
 
 **Identity Statement**:
 A one-to-three-sentence prose introduction at the top of the home page describing who Kihyun is. It is currently the only member of **Translatable Content** — the only surface that flips when the **Language Toggle** is changed.
 
 **Constraints:**
-- The Identity Statement does *not* name specific **Ecosystem**s (Flutter, TypeScript, Rust). Those facts live in the Project list, where each card carries its Ecosystem tag. The Identity Statement is about *who* Kihyun is, not *what tools* he uses. Future edits that try to inline ecosystem names should be reverted; if you want to surface the cross-ecosystem fact more loudly, change the Project list, not the Identity Statement.
+- The Identity Statement does *not* name specific **Ecosystem**s (Flutter, TypeScript, Rust). Those facts live in the Open Source list, where each **Package** carries its Ecosystem tag. The Identity Statement is about *who* Kihyun is, not *what tools* he uses. Future edits that try to inline ecosystem names should be reverted; if you want to surface the cross-ecosystem fact more loudly, change the Open Source list, not the Identity Statement.
 - The Identity Statement is short by design — currently a single sentence, with a soft ceiling of three. Length growth should be challenged: if a new fact wants to be added, prefer adding it to a Project card or removing an existing fact to keep the total compact.
 - The literal text lives in `src/app/page.tsx`, not in this glossary. This file describes the *role* and *constraints* of the Identity Statement, not its current wording.
 _Avoid_: bio, headline, tagline (these imply other forms; this one has a specific structural role)
@@ -40,11 +44,12 @@ _Avoid_: i18n (too generic), multilingual (implies parity that does not exist)
 ## Relationships
 
 - This site points to **Blog** via a single outbound link. There is no content sync, no RSS aggregation, no post preview, no MDX.
-- Each **Project** has at least one source repository and *optionally* one or more registry listings (pub.dev for Flutter, npm for JS/TS, crates.io for Rust). The site treats the registry listing as secondary metadata, not as the Project's identity.
-- Each **Project** has exactly one **canonical destination** — its primary GitHub repository — which is where a card click goes. Registry pages are intentionally not linked from card-level UI; visitors who want to install find that information in the project's README.
-- Each **Project** card displays exactly two pieces of data: its name and its **Ecosystem** tag. No description, no year, no star count, no status indicator. See [[adr-0003-minimal-project-card]].
-- The **Project** list lives in a single page section labeled "Open Source." Items are ordered by curation (most-promoted first) within natural **Ecosystem** clusters — no explicit section headers per Ecosystem; the clustering emerges from sort order.
-- The site has one primary page (the home). It holds two regions: a brief identity statement at the top, and a single list of **Projects** below. **Blog** appears only as one outbound link in the nav area — it is not a section of its own.
+- A **Package** and a **Project** are different things (building block vs. finished service). They are shown in two separate page sections: "Open Source" (Packages) and "Projects". See [[adr-0004-open-source-vs-projects]].
+- Each **Package** has exactly one **canonical destination** — its primary GitHub repository — which is where a card click goes. Registry pages (pub.dev, crates.io, npm) are intentionally not linked from card-level UI; visitors who want to install find that information in the repo's README.
+- Each **Package** card displays exactly two pieces of data: its name and its **Ecosystem** tag. No description, no year, no star count, no status indicator. See [[adr-0003-minimal-project-card]].
+- The "Open Source" list orders **Package**s by curation (most-promoted first) within natural **Ecosystem** clusters — no explicit per-Ecosystem headers; the clustering emerges from sort order.
+- Each **Project** card currently displays just its name (linking to its **canonical destination**). Its additional metadata (live URL vs. repo, a kind label) is deferred — to be decided later.
+- The site has one primary page (the home): a brief identity statement at the top, then the "Open Source" section, then the "Projects" section. **Blog** appears only as one outbound link in the nav area — it is not a section of its own.
 - The nav area holds exactly two outbound links — **Blog** (`https://blog.kihyun1998.com`) and GitHub profile (`https://github.com/kihyun1998`) — plus the **Language Toggle** and a theme toggle. No Twitter, LinkedIn, or email link; anyone needing contact finds it on the GitHub profile.
 
 ## Flagged ambiguities
