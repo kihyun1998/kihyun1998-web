@@ -49,7 +49,7 @@ export function LinkRow({
         rel="noreferrer"
         className="group flex items-baseline justify-between gap-4 py-3"
       >
-        <span className="text-link underline-offset-4 group-hover:underline">
+        <span className="text-foreground underline-offset-4 transition-colors group-hover:text-link group-hover:underline">
           {name}
         </span>
         {meta && (
