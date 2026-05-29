@@ -12,7 +12,7 @@ const GITHUB_URL = 'https://github.com/kihyun1998';
 
 export function SiteHeader() {
   return (
-    <header className="flex items-baseline justify-between gap-6">
+    <header className="flex flex-col gap-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
       <Link href="/" className="text-xl font-semibold tracking-tight">
         Ki Hyun Park
       </Link>
