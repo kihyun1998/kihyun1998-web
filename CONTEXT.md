@@ -17,7 +17,7 @@ A standalone service or application authored by Kihyun that a person *uses direc
 _Avoid_: package/library (those are the building-block category, i.e. **Package**), app (too narrow — some are services, not apps)
 
 **Ecosystem**:
-A short tag (e.g. `Flutter`, `TypeScript`, `Rust`) that signals the runtime/framework context of a **Package** to a browsing developer. Chosen for *informativeness* over consistency — pick the tag that most quickly tells a passing developer "this is relevant to me." It is metadata on a Package. (Projects do not currently carry an Ecosystem tag — their metadata is deferred.)
+A short tag (`Flutter`, `Rust`, `npm`) that signals the runtime/registry context of a **Package** to a browsing developer. Chosen for *informativeness* over consistency — pick the tag that most quickly tells a passing developer "this is relevant to me" (it doubles as a hint of which registry the card links to). It is metadata on a Package. (Projects do not currently carry an Ecosystem tag — their metadata is deferred.)
 _Avoid_: language (overlaps but isn't the same — "Flutter" is more useful than "Dart"), stack, tech
 
 **Identity Statement**:
@@ -45,7 +45,7 @@ _Avoid_: i18n (too generic), multilingual (implies parity that does not exist)
 
 - This site points to **Blog** via a single outbound link. There is no content sync, no RSS aggregation, no post preview, no MDX.
 - A **Package** and a **Project** are different things (building block vs. finished service). They are shown in two separate page sections: "Open Source" (Packages) and "Projects". See [[adr-0004-open-source-vs-projects]].
-- Each **Package** has exactly one **canonical destination** — its primary GitHub repository — which is where a card click goes. Registry pages (pub.dev, crates.io, npm) are intentionally not linked from card-level UI; visitors who want to install find that information in the repo's README.
+- Each **Package** has exactly one **canonical destination** — its registry page (pub.dev for Flutter, crates.io for Rust, npm for npm) — which is where a card click goes. The registry page carries install info, rendered docs, and version. GitHub repos are not linked from card-level UI. See [[adr-0006-link-packages-to-registry]].
 - Each **Package** card displays exactly two pieces of data: its name and its **Ecosystem** tag. No description, no year, no star count, no status indicator. See [[adr-0003-minimal-project-card]].
 - The "Open Source" list orders **Package**s by curation (most-promoted first) within natural **Ecosystem** clusters — no explicit per-Ecosystem headers; the clustering emerges from sort order.
 - Each **Project** card currently displays just its name (linking to its **canonical destination**). Its additional metadata (live URL vs. repo, a kind label) is deferred — to be decided later.
