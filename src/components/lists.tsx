@@ -1,3 +1,4 @@
+import { Children } from 'react';
 import Link from 'next/link';
 
 // The "Open Source" / "Projects" list primitives, shared by the home page
@@ -14,11 +15,16 @@ export function Section({
   seeAllHref?: string;
   children: React.ReactNode;
 }) {
+  const isEmpty = Children.count(children) === 0;
   return (
     <section className="mt-20">
       <h2 className="text-sm font-medium text-muted-foreground">{title}</h2>
-      <ul className="mt-4 divide-y divide-border">{children}</ul>
-      {seeAllHref && (
+      {isEmpty ? (
+        <p className="mt-4 text-sm text-muted-foreground">Nothing here yet.</p>
+      ) : (
+        <ul className="mt-4 divide-y divide-border">{children}</ul>
+      )}
+      {seeAllHref && !isEmpty && (
         <Link
           href={seeAllHref}
           className="mt-4 inline-block text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -49,7 +55,7 @@ export function LinkRow({
         rel="noreferrer"
         className="group flex items-baseline justify-between gap-4 py-3"
       >
-        <span className="text-foreground underline-offset-4 transition-colors group-hover:text-link group-hover:underline">
+        <span className="min-w-0 break-words text-foreground underline-offset-4 transition-colors group-hover:text-link group-hover:underline">
           {name}
         </span>
         {meta && (

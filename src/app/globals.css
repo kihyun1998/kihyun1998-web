@@ -168,9 +168,27 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
+  }
+  /* Visible keyboard focus. The tweakcn default (outline-ring/50, no width)
+     was effectively invisible; this is a real 2px ring. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  /* Respect reduced-motion: neutralize the color/opacity transitions used
+     on links, toggles, and hover states. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }

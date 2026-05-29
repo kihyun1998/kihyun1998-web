@@ -10,7 +10,9 @@ import { identityStatement } from '@/lib/i18n';
 export function IdentityStatement() {
   const { language } = useLanguage();
   return (
-    <p className="text-lg leading-relaxed text-foreground">
+    // lang follows the toggle so screen readers pronounce the Korean string
+    // with a Korean speech engine (the page-level <html lang> stays "en").
+    <p lang={language} className="text-lg leading-relaxed text-foreground">
       {identityStatement[language]}
     </p>
   );
