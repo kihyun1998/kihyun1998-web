@@ -14,5 +14,10 @@ export type Project = {
 };
 
 export const projects: Project[] = [
-  { name: 'Just MLB', href: 'https://mlb.kihyun1998.com/' },
+  { name: 'Just Apps', href: 'https://just-apps-homepage.vercel.app' },
+  { name: 'Just Insight', href: 'https://insight.kihyun1998.com' },
+  { name: 'Just MLB', href: 'https://mlb.kihyun1998.com' },
+  { name: 'Just PDF Web', href: 'https://just-pdf-web.vercel.app' },
+  { name: 'Pricly', href: 'https://pricly.vercel.app' },
+  { name: 'Just Roster', href: 'https://just-roster.vercel.app' },
 ];
