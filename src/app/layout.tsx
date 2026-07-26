@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/next';
 import { LanguageProvider } from '@/components/language';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
@@ -66,6 +67,7 @@ export default function RootLayout({
             <SiteFooter />
           </main>
         </LanguageProvider>
+        <Analytics />
       </body>
     </html>
   );
