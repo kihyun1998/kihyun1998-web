@@ -6,6 +6,9 @@ import { packages } from '@/lib/open-source';
 // capped "Open Source" section.
 export const metadata: Metadata = {
   title: 'Open Source — Ki Hyun Park',
+  description:
+    'Open-source packages by Ki Hyun Park across Flutter, Rust, and npm.',
+  alternates: { canonical: '/open-source' },
 };
 
 export default function OpenSourcePage() {

@@ -21,6 +21,9 @@ export const metadata: Metadata = {
   title: 'Ki Hyun Park',
   description:
     "I'm a developer interested in defining problems and solving them.",
+  // Non-www is the canonical host; www 301s here. Stated explicitly so Google
+  // never has to guess which variant to index.
+  alternates: { canonical: '/' },
   openGraph: {
     title: 'Ki Hyun Park',
     description:

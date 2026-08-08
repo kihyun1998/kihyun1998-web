@@ -6,6 +6,8 @@ import { projects } from '@/lib/projects';
 // capped "Projects" section.
 export const metadata: Metadata = {
   title: 'Projects — Ki Hyun Park',
+  description: 'Services and applications built by Ki Hyun Park.',
+  alternates: { canonical: '/projects' },
 };
 
 export default function ProjectsPage() {
