@@ -46,13 +46,19 @@ export const packages: Package[] = [
   { name: 'just_save_gallery', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_save_gallery' },
   { name: 'just_tooltip', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_tooltip' },
   { name: 'window_lockable', ecosystem: 'Flutter', href: 'https://pub.dev/packages/window_lockable' },
+  { name: 'boring_avatars', ecosystem: 'Flutter', href: 'https://pub.dev/packages/boring_avatars' },
+  { name: 'ffi_url_launcher', ecosystem: 'Flutter', href: 'https://pub.dev/packages/ffi_url_launcher' },
 
   // Rust — crates.io
   { name: 'justpdf', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf' },
   { name: 'justpdf-cli', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-cli' },
   { name: 'justbig2', ecosystem: 'Rust', href: 'https://crates.io/crates/justbig2' },
   { name: 'justjp2', ecosystem: 'Rust', href: 'https://crates.io/crates/justjp2' },
+  { name: 'justerm-core', ecosystem: 'Rust', href: 'https://crates.io/crates/justerm-core' },
 
   // npm
   { name: 'justpdf-compress-wasm', ecosystem: 'npm', href: 'https://www.npmjs.com/package/@kihyun1998/justpdf-compress-wasm' },
+  { name: 'justerm-web', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-web' },
+  { name: 'justerm-renderer', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-renderer' },
+  { name: 'justerm-wasm-decode', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-wasm-decode' },
 ];
