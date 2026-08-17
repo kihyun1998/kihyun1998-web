@@ -6,30 +6,38 @@
 // Language: it overrides an environment preference, not declared content, so
 // it has no React context — it just flips the `dark` class on <html>.
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { Moon, Sun } from 'lucide-react';
+import { createClientStore } from '@/lib/client-store';
 
 const STORAGE_KEY = 'theme';
 
-export function ThemeToggle() {
-  const [mounted, setMounted] = useState(false);
-  const [isDark, setIsDark] = useState(false);
+const themeStore = createClientStore();
 
-  useEffect(() => {
-    setMounted(true);
-    setIsDark(document.documentElement.classList.contains('dark'));
-  }, []);
+// The resolved theme lives on <html>, not in React state — the blocking script
+// puts it there before paint. Reading it back on every render keeps that class
+// the single source of truth.
+const isDarkNow = () => document.documentElement.classList.contains('dark');
+
+// The server can't know the resolved theme, so it reports nothing and the
+// button renders as a stable placeholder until hydration.
+const unknownOnServer = () => null;
+
+export function ThemeToggle() {
+  const isDark = useSyncExternalStore(
+    themeStore.subscribe,
+    isDarkNow,
+    unknownOnServer,
+  );
 
   function toggle() {
-    const next = !isDark;
-    setIsDark(next);
+    const next = !isDarkNow();
     document.documentElement.classList.toggle('dark', next);
     localStorage.setItem(STORAGE_KEY, next ? 'dark' : 'light');
+    themeStore.notify();
   }
 
-  // Render a stable placeholder until mounted so server and client markup
-  // match (the server can't know the resolved theme).
-  if (!mounted) {
+  if (isDark === null) {
     return <span className="inline-block size-4" aria-hidden />;
   }
 
