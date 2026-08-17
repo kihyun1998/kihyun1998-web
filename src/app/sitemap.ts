@@ -1,11 +1,18 @@
 import type { MetadataRoute } from 'next';
+import { families } from '@/lib/open-source';
 
-// The site's full route list. Kept by hand — there are only three routes and
-// none are generated, so a manual list is honest about what exists.
+const ORIGIN = 'https://kihyun1998.com';
+
+// The site's full route list: three fixed pages, plus one page per Family.
+// The Family entries are derived from the same array the pages render, so a new
+// Family cannot ship without entering the sitemap.
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
-    { url: 'https://kihyun1998.com' },
-    { url: 'https://kihyun1998.com/open-source' },
-    { url: 'https://kihyun1998.com/projects' },
+    { url: ORIGIN },
+    { url: `${ORIGIN}/open-source` },
+    { url: `${ORIGIN}/projects` },
+    ...families.map((family) => ({
+      url: `${ORIGIN}/open-source/${family.slug}`,
+    })),
   ];
 }

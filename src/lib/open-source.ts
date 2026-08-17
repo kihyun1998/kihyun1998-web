@@ -1,17 +1,20 @@
 // The "Open Source" section — Packages: reusable libraries/plugins/crates that
-// other developers install and build on. See CONTEXT.md ("Package", "Ecosystem")
-// and docs/adr/0003-minimal-project-card.md + 0004-open-source-vs-projects.md +
-// 0006-link-packages-to-registry.md.
+// other developers install and build on, and Families: groups of Packages built
+// to be used together. See CONTEXT.md ("Package", "Family", "Ecosystem") and
+// docs/adr/0003-minimal-project-card.md + 0004-open-source-vs-projects.md +
+// 0006-link-packages-to-registry.md + 0007-package-families.md.
 //
 // Source of truth: Kihyun's GitHub profile README (the curated list he
 // maintains). Order here mirrors that README (ecosystem clusters: Flutter,
 // then Rust, then npm).
 //
 // Rules:
-// - Hand-curated, not auto-pulled from GitHub.
+// - Hand-curated, not auto-pulled from GitHub. Order is curation, never a sort.
 // - A card shows exactly two things: `name` and `ecosystem`. No description.
 // - Clicking a card goes to `href` — the package's registry page (pub.dev /
 //   crates.io / npm), where install info, docs, and version live.
+// - A Package belongs to at most one Family, and is still declared exactly once
+//   in `packages` — a Family references its members by name.
 
 export type Ecosystem = 'Flutter' | 'Rust' | 'npm';
 
@@ -19,6 +22,15 @@ export type Package = {
   name: string;
   ecosystem: Ecosystem;
   href: string;
+};
+
+// A group of Packages built to be used together. `members` names entries in
+// `packages`, in the order they should be read (entry point first).
+export type Family = {
+  // URL segment: /open-source/<slug>
+  slug: string;
+  name: string;
+  members: string[];
 };
 
 export const packages: Package[] = [
@@ -62,3 +74,157 @@ export const packages: Package[] = [
   { name: 'justerm-renderer', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-renderer' },
   { name: 'justerm-wasm-decode', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-wasm-decode' },
 ];
+
+export const families: Family[] = [
+  {
+    slug: 'justerm',
+    name: 'justerm',
+    // Entry point first, then its consumers.
+    members: ['justerm-core', 'justerm-web', 'justerm-renderer', 'justerm-wasm-decode'],
+  },
+];
+
+// One row of the Open Source list: either a standalone Package or a Family
+// standing in for its members.
+export type PackageRow = Package & { kind: 'package' };
+
+export type FamilyRow = {
+  kind: 'family';
+  slug: string;
+  name: string;
+  // Internal, unlike a Package row — a Family has no registry page.
+  href: string;
+  memberCount: number;
+};
+
+export type OpenSourceRow = PackageRow | FamilyRow;
+
+export type ResolvedFamily = {
+  slug: string;
+  name: string;
+  members: Package[];
+};
+
+const URL_SAFE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function indexByName(allPackages: Package[]): Map<string, Package> {
+  return new Map(allPackages.map((entry) => [entry.name, entry]));
+}
+
+// Resolving a Family's members is also how membership is checked: a name that
+// isn't in the catalogue has nothing to resolve to. Keeping the two together
+// means there is one lookup, and one error, rather than a validation pass and a
+// resolution pass that can disagree.
+function resolveMembers(
+  family: Family,
+  byName: Map<string, Package>,
+): Package[] {
+  return family.members.map((member) => {
+    const entry = byName.get(member);
+    if (!entry) {
+      throw new Error(
+        `Family "${family.slug}" names "${member}", which is not in packages.`,
+      );
+    }
+    return entry;
+  });
+}
+
+// Curation mistakes are invisible in the arrays above and would ship as a
+// silently wrong list, so they throw. `openSourceRows` is derived at module
+// load and every page imports it, which makes these build-time failures.
+function assertFamiliesAreWellFormed(
+  byName: Map<string, Package>,
+  allFamilies: Family[],
+): void {
+  const claimedBy = new Map<string, string>();
+  const slugs = new Set<string>();
+
+  for (const family of allFamilies) {
+    if (!URL_SAFE_SLUG.test(family.slug)) {
+      throw new Error(
+        `Family slug "${family.slug}" is not URL-safe (lowercase letters, digits, single hyphens).`,
+      );
+    }
+    if (slugs.has(family.slug)) {
+      throw new Error(`Duplicate Family slug "${family.slug}".`);
+    }
+    slugs.add(family.slug);
+
+    if (family.members.length < 2) {
+      throw new Error(
+        `Family "${family.slug}" needs at least two members; a Family of one is just a Package.`,
+      );
+    }
+
+    resolveMembers(family, byName);
+
+    for (const member of family.members) {
+      const owner = claimedBy.get(member);
+      if (owner) {
+        throw new Error(
+          `Package "${member}" is claimed by both "${owner}" and "${family.slug}"; a Package belongs to at most one Family.`,
+        );
+      }
+      claimedBy.set(member, family.slug);
+    }
+  }
+}
+
+// A Family appears where curation put its first member and its members drop out
+// of the flat list, so declared order still governs everything. A Family
+// therefore outranks the Ecosystem clustering it sits inside — see
+// docs/adr/0007-package-families.md.
+export function deriveOpenSourceRows(
+  allPackages: Package[] = packages,
+  allFamilies: Family[] = families,
+): OpenSourceRow[] {
+  assertFamiliesAreWellFormed(indexByName(allPackages), allFamilies);
+
+  const familyOfMember = new Map<string, Family>();
+  for (const family of allFamilies) {
+    for (const member of family.members) {
+      familyOfMember.set(member, family);
+    }
+  }
+
+  const emitted = new Set<string>();
+  const rows: OpenSourceRow[] = [];
+
+  for (const entry of allPackages) {
+    const family = familyOfMember.get(entry.name);
+    if (!family) {
+      rows.push({ kind: 'package', ...entry });
+      continue;
+    }
+    if (emitted.has(family.slug)) continue;
+    emitted.add(family.slug);
+    rows.push({
+      kind: 'family',
+      slug: family.slug,
+      name: family.name,
+      href: `/open-source/${family.slug}`,
+      memberCount: family.members.length,
+    });
+  }
+
+  return rows;
+}
+
+// The list every Open Source surface renders. Derived once, at module load.
+export const openSourceRows: OpenSourceRow[] = deriveOpenSourceRows();
+
+export function resolveFamily(
+  slug: string,
+  allPackages: Package[] = packages,
+  allFamilies: Family[] = families,
+): ResolvedFamily | undefined {
+  const family = allFamilies.find((candidate) => candidate.slug === slug);
+  if (!family) return undefined;
+
+  return {
+    slug: family.slug,
+    name: family.name,
+    members: resolveMembers(family, indexByName(allPackages)),
+  };
+}
