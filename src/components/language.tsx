@@ -8,13 +8,24 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
-  useState,
+  useSyncExternalStore,
   type ReactNode,
 } from 'react';
+import { createClientStore } from '@/lib/client-store';
 import type { Language } from '@/lib/i18n';
 
 const STORAGE_KEY = 'lang';
+
+const languageStore = createClientStore();
+
+const storedLanguage = (): Language => {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  return stored === 'ko' || stored === 'en' ? stored : 'en';
+};
+
+// The server has no localStorage, so it renders English — see the flash note on
+// the provider below.
+const englishOnServer = (): Language => 'en';
 
 type LanguageContextValue = {
   language: Language;
@@ -24,21 +35,18 @@ type LanguageContextValue = {
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  // Start at 'en' to match the server-rendered HTML, then adopt the stored
-  // choice after mount. One sentence may briefly flash EN→KO; acceptable.
-  const [language, setLanguage] = useState<Language>('en');
-
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'ko' || stored === 'en') setLanguage(stored);
-  }, []);
+  // Renders 'en' to match the server-rendered HTML, then adopts the stored
+  // choice at hydration. One sentence may briefly flash EN→KO; acceptable.
+  // localStorage stays the source of truth — there is no copy of it in state.
+  const language = useSyncExternalStore(
+    languageStore.subscribe,
+    storedLanguage,
+    englishOnServer,
+  );
 
   const toggle = useCallback(() => {
-    setLanguage((prev) => {
-      const next = prev === 'en' ? 'ko' : 'en';
-      localStorage.setItem(STORAGE_KEY, next);
-      return next;
-    });
+    localStorage.setItem(STORAGE_KEY, storedLanguage() === 'en' ? 'ko' : 'en');
+    languageStore.notify();
   }, []);
 
   return (
