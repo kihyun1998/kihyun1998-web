@@ -205,6 +205,21 @@ describe('the curated catalogue', () => {
     expect(names(openSourceRows)).not.toContain('justerm-core');
   });
 
+  it('shows justpdf as one row, flagship Package included', () => {
+    const justpdf = openSourceRows.find(
+      (row) => row.kind === 'family' && row.slug === 'justpdf',
+    );
+
+    expect(justpdf).toMatchObject({ name: 'justpdf', memberCount: 5 });
+    // The Family and its flagship member share a name; only the Family shows.
+    expect(
+      openSourceRows.filter((row) => row.name === 'justpdf'),
+    ).toHaveLength(1);
+    expect(resolveFamily('justpdf')?.members.map((m) => m.name)).toContain(
+      'justpdf',
+    );
+  });
+
   it('keeps every Family member declared exactly once in packages', () => {
     const memberNames = families.flatMap((family) => family.members);
     const packageNames = packages.map((entry) => entry.name);

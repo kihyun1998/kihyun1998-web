@@ -77,6 +77,20 @@ export const packages: Package[] = [
 
 export const families: Family[] = [
   {
+    slug: 'justpdf',
+    name: 'justpdf',
+    // The library first, then the CLI, the codecs it consumes, and the wasm
+    // build. A Family named after its flagship Package is fine — see
+    // docs/adr/0007-package-families.md.
+    members: [
+      'justpdf',
+      'justpdf-cli',
+      'justbig2',
+      'justjp2',
+      'justpdf-compress-wasm',
+    ],
+  },
+  {
     slug: 'justerm',
     name: 'justerm',
     // Entry point first, then its consumers.
