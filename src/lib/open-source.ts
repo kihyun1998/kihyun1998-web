@@ -16,6 +16,12 @@
 // - A Package belongs to at most one Family, and is still declared exactly once
 //   in `packages` — a Family references its members by name.
 
+// Shown under the section heading. Lifted from CONTEXT.md's definition of
+// Package so the site and the glossary say the same thing in the same words.
+// English-only, per ADR-0001's default for any new text.
+export const openSourceLede =
+  'Libraries, plugins, and crates other developers install and build on';
+
 export type Ecosystem = 'Flutter' | 'Rust' | 'npm';
 
 export type Package = {

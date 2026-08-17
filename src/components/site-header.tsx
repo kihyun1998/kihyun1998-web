@@ -13,12 +13,13 @@ const GITHUB_URL = 'https://github.com/kihyun1998';
 export function SiteHeader() {
   return (
     <header className="flex flex-col gap-3 sm:flex-row sm:items-baseline sm:justify-between sm:gap-6">
-      <Link
-        href="/"
-        className="text-xl font-semibold tracking-tight transition-opacity hover:opacity-70"
-      >
-        Ki Hyun Park
-      </Link>
+      {/* The wordmark is the page's h1 on every route, so each page has one
+          top-level heading and the Section headings sit under it as h2s. */}
+      <h1 className="text-xl font-semibold tracking-tight">
+        <Link href="/" className="transition-opacity hover:opacity-70">
+          Ki Hyun Park
+        </Link>
+      </h1>
       <nav className="flex items-center gap-4">
         <ExternalLink href={BLOG_URL}>Blog</ExternalLink>
         <ExternalLink href={GITHUB_URL}>GitHub</ExternalLink>

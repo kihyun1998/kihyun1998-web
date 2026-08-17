@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Section } from '@/components/lists';
 import { OpenSourceRow } from '@/components/open-source-row';
-import { openSourceRows } from '@/lib/open-source';
+import { openSourceLede, openSourceRows } from '@/lib/open-source';
 
 // Full list of Packages — the overflow target of the home page's
 // capped "Open Source" section. Families stay collapsed here too; their own
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 
 export default function OpenSourcePage() {
   return (
-    <Section title="Open Source">
+    <Section title="Open Source" lede={openSourceLede}>
       {openSourceRows.map((row) => (
         <OpenSourceRow key={row.href} row={row} />
       ))}

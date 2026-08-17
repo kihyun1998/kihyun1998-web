@@ -64,7 +64,10 @@ export default function RootLayout({
       </head>
       <body>
         <LanguageProvider>
-          <main className="mx-auto max-w-2xl px-6 py-24 sm:py-32">
+          {/* Top padding is tuned so a phone's first viewport carries the
+              Identity Statement and the start of the first section, rather
+              than the header and whitespace. */}
+          <main className="mx-auto max-w-2xl px-6 py-16 sm:py-24">
             <SiteHeader />
             {children}
             <SiteFooter />

@@ -1,8 +1,8 @@
 import { IdentityStatement } from '@/components/identity-statement';
 import { Section, LinkRow } from '@/components/lists';
 import { OpenSourceRow } from '@/components/open-source-row';
-import { openSourceRows } from '@/lib/open-source';
-import { projects } from '@/lib/projects';
+import { openSourceLede, openSourceRows } from '@/lib/open-source';
+import { projects, projectsLede } from '@/lib/projects';
 
 // Home shows a curated subset of each section, capped at HOME_LIMIT. Each
 // section always links to its full-list page (/open-source, /projects) — even
@@ -22,6 +22,7 @@ export default function Home() {
 
       <Section
         title="Open Source"
+        lede={openSourceLede}
         seeAllHref="/open-source"
       >
         {openSourceRows.slice(0, HOME_LIMIT).map((row) => (
@@ -31,10 +32,17 @@ export default function Home() {
 
       <Section
         title="Projects"
+        lede={projectsLede}
         seeAllHref="/projects"
+        bordered
       >
         {projects.slice(0, HOME_LIMIT).map((project) => (
-          <LinkRow key={project.href} href={project.href} name={project.name} />
+          <LinkRow
+            key={project.href}
+            href={project.href}
+            name={project.name}
+            description={project.description}
+          />
         ))}
       </Section>
     </>
