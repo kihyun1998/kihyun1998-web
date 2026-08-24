@@ -61,6 +61,30 @@ export default function RootLayout({
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.css"
         />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/* AdSense loader. This is the apex domain, and AdSense reviews and
+            approves at the *domain* level — subdomains cannot be registered
+            separately and inherit the parent's status — so this site is the
+            one under review even though the ads run on blog.kihyun1998.com.
+            It carried ads.txt but never the code itself.
+
+            Google's instruction is literal about the placement: "you need to
+            paste it between the <head> and </head> tags of your site", on
+            every page. This layout is every page.
+
+            A raw <script>, deliberately — NOT next/script. Under appDir,
+            `afterInteractive` with a src only calls ReactDOM.preload and
+            renders null, and `beforeInteractive` emits a preload plus a
+            bootstrap push; neither puts a <script src> in the HTML the server
+            sends. A crawler that does not run JS sees no tag at all. That was
+            measured in the blog repo (its #87) and cost a full review cycle.
+
+            No <ins> ad units here on purpose: they are not required for
+            review, and these are navigation-shaped pages. */}
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8392839309180094"
+          crossOrigin="anonymous"
+        />
       </head>
       <body>
         <LanguageProvider>
