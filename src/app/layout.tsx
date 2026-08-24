@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next';
 import { LanguageProvider } from '@/components/language';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
+import { SITE_ORIGIN } from '@/lib/site';
 import './globals.css';
 
 // Inter is self-hosted by next/font and exposed as --font-inter, which
@@ -17,7 +18,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://kihyun1998.com'),
+  metadataBase: new URL(SITE_ORIGIN),
   title: 'Ki Hyun Park',
   description:
     "I'm a developer interested in defining problems and solving them.",
@@ -28,7 +29,7 @@ export const metadata: Metadata = {
     title: 'Ki Hyun Park',
     description:
       "I'm a developer interested in defining problems and solving them.",
-    url: 'https://kihyun1998.com',
+    url: SITE_ORIGIN,
     siteName: 'Ki Hyun Park',
     type: 'website',
   },
