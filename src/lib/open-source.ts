@@ -66,6 +66,10 @@ export const packages: Package[] = [
   { name: 'window_lockable', ecosystem: 'Flutter', href: 'https://pub.dev/packages/window_lockable' },
   { name: 'boring_avatars', ecosystem: 'Flutter', href: 'https://pub.dev/packages/boring_avatars' },
   { name: 'ffi_url_launcher', ecosystem: 'Flutter', href: 'https://pub.dev/packages/ffi_url_launcher' },
+  { name: 'just_sonner', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_sonner' },
+  { name: 'flutter_syntax_highlight', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_syntax_highlight' },
+  { name: 'flutter_example_template', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_example_template' },
+  { name: 'flutter_smooth_wheel_scroll', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_smooth_wheel_scroll' },
 
   // Rust — crates.io
   { name: 'justpdf', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf' },
