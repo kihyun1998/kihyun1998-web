@@ -77,12 +77,14 @@ export const packages: Package[] = [
   { name: 'justbig2', ecosystem: 'Rust', href: 'https://crates.io/crates/justbig2' },
   { name: 'justjp2', ecosystem: 'Rust', href: 'https://crates.io/crates/justjp2' },
   { name: 'justerm-core', ecosystem: 'Rust', href: 'https://crates.io/crates/justerm-core' },
+  { name: 'justsftp', ecosystem: 'Rust', href: 'https://crates.io/crates/justsftp' },
 
   // npm
   { name: 'justpdf-compress-wasm', ecosystem: 'npm', href: 'https://www.npmjs.com/package/@kihyun1998/justpdf-compress-wasm' },
   { name: 'justerm-web', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-web' },
   { name: 'justerm-renderer', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-renderer' },
   { name: 'justerm-wasm-decode', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-wasm-decode' },
+  { name: 'justable', ecosystem: 'npm', href: 'https://www.npmjs.com/package/@kihyun1998/justable' },
 ];
 
 export const families: Family[] = [
