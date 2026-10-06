@@ -73,6 +73,11 @@ export const packages: Package[] = [
 
   // Rust — crates.io
   { name: 'justpdf', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf' },
+  { name: 'justpdf-core', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-core' },
+  { name: 'justpdf-render', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-render' },
+  { name: 'justpdf-formats', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-formats' },
+  { name: 'justpdf-special', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-special' },
+  { name: 'justpdf-ffi', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-ffi' },
   { name: 'justpdf-cli', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-cli' },
   { name: 'justbig2', ecosystem: 'Rust', href: 'https://crates.io/crates/justbig2' },
   { name: 'justjp2', ecosystem: 'Rust', href: 'https://crates.io/crates/justjp2' },
@@ -91,11 +96,16 @@ export const families: Family[] = [
   {
     slug: 'justpdf',
     name: 'justpdf',
-    // The library first, then the CLI, the codecs it consumes, and the wasm
-    // build. A Family named after its flagship Package is fine — see
-    // docs/adr/0007-package-families.md.
+    // The library first, then its sub-crates, the CLI, the codecs it
+    // consumes, and the wasm build. A Family named after its flagship
+    // Package is fine — see docs/adr/0007-package-families.md.
     members: [
       'justpdf',
+      'justpdf-core',
+      'justpdf-render',
+      'justpdf-formats',
+      'justpdf-special',
+      'justpdf-ffi',
       'justpdf-cli',
       'justbig2',
       'justjp2',

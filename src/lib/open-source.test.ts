@@ -210,7 +210,7 @@ describe('the curated catalogue', () => {
       (row) => row.kind === 'family' && row.slug === 'justpdf',
     );
 
-    expect(justpdf).toMatchObject({ name: 'justpdf', memberCount: 5 });
+    expect(justpdf).toMatchObject({ name: 'justpdf', memberCount: 10 });
     // The Family and its flagship member share a name; only the Family shows.
     expect(
       openSourceRows.filter((row) => row.name === 'justpdf'),
