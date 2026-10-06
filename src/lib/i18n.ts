@@ -1,4 +1,4 @@
-// Translatable Content. See CONTEXT.md and docs/adr/0001-language-strategy.md.
+// Translatable Content. See GLOSSARY.md and docs/adr/0001-language-strategy.md.
 //
 // English is the source of truth. The ONLY surface that has a Korean
 // translation is the Identity Statement below. Everything else on the site

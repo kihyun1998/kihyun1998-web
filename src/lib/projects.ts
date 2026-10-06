@@ -1,5 +1,5 @@
 // The "Projects" section — standalone services/apps that a person uses directly
-// (not building blocks). See CONTEXT.md ("Project", "Section Lede") and
+// (not building blocks). See GLOSSARY.md ("Project", "Section Lede") and
 // docs/adr/0004-open-source-vs-projects.md + 0008-home-introduces-the-person.md.
 //
 // Rules:
@@ -61,7 +61,7 @@ export const projects: Project[] = validateProjects([
   { name: 'Just Roster', href: 'https://just-roster.vercel.app' },
 ]);
 
-// Shown under the section heading. Lifted from CONTEXT.md's definition of
+// Shown under the section heading. Lifted from GLOSSARY.md's definition of
 // Project so the site and the glossary say the same thing in the same words.
 // English-only, per ADR-0001's default for any new text.
 export const projectsLede = 'Services and applications you use directly';

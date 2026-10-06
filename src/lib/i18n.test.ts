@@ -5,7 +5,7 @@ import { identityStatement } from './i18n';
 // Toggle swaps it whole. A Korean version that lags the English by a sentence
 // would show a visitor a shorter statement with no sign anything is missing —
 // so the two are pinned to the same sentence count, and to the ceiling
-// CONTEXT.md sets.
+// GLOSSARY.md sets.
 
 const SENTENCE_CEILING = 3;
 

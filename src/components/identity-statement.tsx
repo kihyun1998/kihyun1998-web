@@ -2,7 +2,7 @@
 
 // The Identity Statement — the only Translatable Content on the site.
 // Reads the current language and renders the matching sentence. The literal
-// text lives in src/lib/i18n.ts; the constraints on it live in CONTEXT.md.
+// text lives in src/lib/i18n.ts; the constraints on it live in GLOSSARY.md.
 
 import { useLanguage } from '@/components/language';
 import { identityStatement } from '@/lib/i18n';

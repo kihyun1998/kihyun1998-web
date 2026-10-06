@@ -5,7 +5,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 
 // Shared across every page (rendered once in layout.tsx). The wordmark links
 // home so subpages have a way back. Holds exactly the two outbound links
-// (Blog, GitHub) plus the language and theme toggles — see CONTEXT.md.
+// (Blog, GitHub) plus the language and theme toggles — see GLOSSARY.md.
 
 const BLOG_URL = 'https://blog.kihyun1998.com';
 const GITHUB_URL = 'https://github.com/kihyun1998';

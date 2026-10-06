@@ -1,6 +1,6 @@
 // The "Open Source" section — Packages: reusable libraries/plugins/crates that
 // other developers install and build on, and Families: groups of Packages built
-// to be used together. See CONTEXT.md ("Package", "Family", "Ecosystem") and
+// to be used together. See GLOSSARY.md ("Package", "Family", "Ecosystem") and
 // docs/adr/0003-minimal-project-card.md + 0004-open-source-vs-projects.md +
 // 0006-link-packages-to-registry.md + 0007-package-families.md.
 //
@@ -16,7 +16,7 @@
 // - A Package belongs to at most one Family, and is still declared exactly once
 //   in `packages` — a Family references its members by name.
 
-// Shown under the section heading. Lifted from CONTEXT.md's definition of
+// Shown under the section heading. Lifted from GLOSSARY.md's definition of
 // Package so the site and the glossary say the same thing in the same words.
 // English-only, per ADR-0001's default for any new text.
 export const openSourceLede =
