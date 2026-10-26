@@ -27,6 +27,8 @@ Previously the Open Source list's clusters emerged from Ecosystem sort order (Fl
 
 **Where** that cluster sits is still curation, not computation: a Family renders at the position its *earliest member* holds in `packages`, and its members drop out of the flat list. So `justerm` appears where `justerm-core` used to, at the tail of the Rust cluster. Moving a Family means moving its members — the order of `packages` remains the single ordering mechanism, mirroring the profile README.
 
+*Amended for issue #11:* `/open-source` now has an Ecosystem filter. It narrows the list without reordering it, so the clusters above still decide order. A Family appears under every Ecosystem its members span, as one row, and still carries no Ecosystem tag; picking one tag would mislead, but leaving `justerm` out of the npm filter would hide it.
+
 Note what this does *not* do on its own: a Family is promoted onto the capped home page only if its earliest member was already near the top of `packages`. `justerm` is not, so introducing it changed the home page's six rows by nothing. Freeing home-page slots is a *curation* act — hoisting members — that this decision enables rather than performs.
 
 **Considered and rejected:** *a separate ordering field on the Family* — rejected because it creates a second place where order lives, and the two can disagree. *Sorting Families first, or by member count* — rejected for the same reason ADR-0003 rejected descriptions: it replaces a curator's judgement with a rule that will be wrong at some point and cannot be overridden.

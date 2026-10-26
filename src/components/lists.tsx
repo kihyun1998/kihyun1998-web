@@ -36,17 +36,13 @@ export function Section({
   children: React.ReactNode;
 }) {
   const isEmpty = Children.count(children) === 0;
-  const headingId = slugify(title);
 
   return (
     <section
-      aria-labelledby={headingId}
+      aria-labelledby={slugify(title)}
       className={cn('mt-16', bordered && borderedSpacing)}
     >
-      <h2 id={headingId} className="text-base font-semibold text-foreground">
-        {title}
-      </h2>
-      {lede && <p className="mt-1 text-sm text-muted-foreground">{lede}</p>}
+      <SectionHeading title={title} lede={lede} />
       {isEmpty ? (
         <p className="mt-6 text-sm text-muted-foreground">Nothing here yet.</p>
       ) : (
@@ -63,6 +59,32 @@ export function Section({
     </section>
   );
 }
+
+// A section's heading and lede, for a page whose list is not a plain `Section`
+// list. `aside` sits at the right end of the heading line.
+export function SectionHeading({
+  title,
+  lede,
+  aside,
+}: {
+  title: string;
+  lede?: string;
+  aside?: React.ReactNode;
+}) {
+  return (
+    <>
+      <div className="flex items-baseline justify-between gap-4">
+        <h2 id={slugify(title)} className="text-base font-semibold text-foreground">
+          {title}
+        </h2>
+        {aside}
+      </div>
+      {lede && <p className="mt-1 text-sm text-muted-foreground">{lede}</p>}
+    </>
+  );
+}
+
+export const sectionId = slugify;
 
 const rowClassName = 'group flex items-baseline justify-between gap-4 py-3';
 

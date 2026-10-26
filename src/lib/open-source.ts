@@ -147,6 +147,8 @@ export type FamilyRow = {
   // Internal, unlike a Package row — a Family has no registry page.
   href: string;
   memberCount: number;
+  // Every Ecosystem its members span, by first appearance in `packages`.
+  ecosystems: Ecosystem[];
 };
 
 export type OpenSourceRow = PackageRow | FamilyRow;
@@ -259,12 +261,20 @@ export function deriveOpenSourceRows(
     }
     if (emitted.has(family.slug)) continue;
     emitted.add(family.slug);
+    const members = new Set(family.members);
     rows.push({
       kind: 'family',
       slug: family.slug,
       name: family.name,
       href: `/open-source/${family.slug}`,
       memberCount: family.members.length,
+      ecosystems: [
+        ...new Set(
+          allPackages
+            .filter((candidate) => members.has(candidate.name))
+            .map((candidate) => candidate.ecosystem),
+        ),
+      ],
     });
   }
 
@@ -273,6 +283,56 @@ export function deriveOpenSourceRows(
 
 // The list every Open Source surface renders. Derived once, at module load.
 export const openSourceRows: OpenSourceRow[] = deriveOpenSourceRows();
+
+// Rows per page on /open-source. A Family counts as one row, as on home.
+export const OPEN_SOURCE_PAGE_SIZE = 15;
+
+// What /open-source shows for one `?eco=&page=`: the filters with their
+// counts, and the current page of the chosen one. `ecosystem` undefined is All.
+export type OpenSourceListView = {
+  rows: OpenSourceRow[];
+  ecosystem: Ecosystem | undefined;
+  page: number;
+  pageCount: number;
+  filters: { ecosystem: Ecosystem | undefined; count: number }[];
+};
+
+const rowEcosystems = (row: OpenSourceRow): Ecosystem[] =>
+  row.kind === 'package' ? [row.ecosystem] : row.ecosystems;
+
+// A filter narrows the list without reordering it, and a Family sits under
+// every Ecosystem its members span. The query comes straight from the URL, so
+// nothing here throws: an unknown Ecosystem is All, and a page is clamped.
+export function viewOpenSourceList(
+  rows: OpenSourceRow[],
+  query: { eco?: string | null; page?: string | null },
+  perPage: number = OPEN_SOURCE_PAGE_SIZE,
+): OpenSourceListView {
+  const order = [...new Set(rows.flatMap(rowEcosystems))];
+  const ecosystem = order.find((candidate) => candidate === query.eco);
+  const filtered = ecosystem
+    ? rows.filter((row) => rowEcosystems(row).includes(ecosystem))
+    : rows;
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / perPage));
+  const requested = /^\d+$/.test(query.page ?? '') ? Number(query.page) : 1;
+  const page = Math.min(Math.max(requested, 1), pageCount);
+
+  return {
+    rows: filtered.slice((page - 1) * perPage, page * perPage),
+    ecosystem,
+    page,
+    pageCount,
+    filters: [
+      { ecosystem: undefined, count: rows.length },
+      ...order.map((candidate) => ({
+        ecosystem: candidate,
+        count: rows.filter((row) => rowEcosystems(row).includes(candidate))
+          .length,
+      })),
+    ],
+  };
+}
 
 export function resolveFamily(
   slug: string,
