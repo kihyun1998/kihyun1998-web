@@ -18,6 +18,12 @@
 //   See docs/adr/0009-package-rows-link-registry-and-repo.md.
 // - A Package belongs to at most one Family, and is still declared exactly once
 //   in `packages` — a Family references its members by name.
+// - `uses` / `exampleUses` name the other Packages here that a Package, or only
+//   its example app, depends on. Third-party packages are never listed. pub.dev
+//   shows only the Package's own pubspec; example-app uses come from
+//   example/pubspec.yaml in its repo. They feed the Dependency Map and nothing
+//   else — rows never show them.
+//   See docs/adr/0010-dependency-map.md.
 
 // Shown under the section heading. Lifted from GLOSSARY.md's definition of
 // Package so the site and the glossary say the same thing in the same words.
@@ -34,6 +40,10 @@ export type Package = {
   href: string;
   // GitHub repository.
   repo: string;
+  // Dependencies: Packages here that installing this one pulls in.
+  uses?: string[];
+  // Example Dependencies: Packages here that only its example app uses.
+  exampleUses?: string[];
 };
 
 // A group of Packages built to be used together. `members` names entries in
@@ -52,15 +62,15 @@ export const packages: Package[] = [
   { name: 'flutter_alone', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_alone', repo: 'https://github.com/kihyun1998/flutter_alone' },
   { name: 'flutter_inactive_timer', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_inactive_timer', repo: 'https://github.com/kihyun1998/flutter_inactive_timer' },
   { name: 'flutter_ime', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_ime', repo: 'https://github.com/kihyun1998/flutter_ime' },
-  { name: 'flutter_password_input', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_password_input', repo: 'https://github.com/kihyun1998/flutter_password_input' },
+  { name: 'flutter_password_input', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_password_input', repo: 'https://github.com/kihyun1998/flutter_password_input', uses: ['flutter_ime', 'just_tooltip'] },
   { name: 'flutter_license_manager', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_license_manager', repo: 'https://github.com/kihyun1998/flutter_license_manager' },
   { name: 'flutter_oss_manager', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_oss_manager', repo: 'https://github.com/kihyun1998/flutter_oss_manager' },
-  { name: 'flutter_table_plus', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_table_plus', repo: 'https://github.com/kihyun1998/flutter_table_plus' },
+  { name: 'flutter_table_plus', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_table_plus', repo: 'https://github.com/kihyun1998/flutter_table_plus', uses: ['flutter_checkbox', 'just_tooltip', 'flutter_smooth_wheel_scroll'], exampleUses: ['flutter_example_template', 'flutter_syntax_highlight'] },
   { name: 'macos_window_toolkit', ecosystem: 'Flutter', href: 'https://pub.dev/packages/macos_window_toolkit', repo: 'https://github.com/kihyun1998/macos_window_toolkit' },
   { name: 'flutter_animation_stepper', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_animation_stepper', repo: 'https://github.com/kihyun1998/flutter_animation_stepper' },
-  { name: 'flutter_dropdown_button', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_dropdown_button', repo: 'https://github.com/kihyun1998/flutter_dropdown_button' },
+  { name: 'flutter_dropdown_button', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_dropdown_button', repo: 'https://github.com/kihyun1998/flutter_dropdown_button', uses: ['flutter_checkbox', 'flutter_smooth_wheel_scroll'], exampleUses: ['flutter_example_template'] },
   { name: 'flutter_checkbox', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_checkbox', repo: 'https://github.com/kihyun1998/flutter_checkbox' },
-  { name: 'flutter_folderview', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_folderview', repo: 'https://github.com/kihyun1998/flutter_folderview' },
+  { name: 'flutter_folderview', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_folderview', repo: 'https://github.com/kihyun1998/flutter_folderview', uses: ['just_tooltip'], exampleUses: ['flutter_example_template', 'flutter_smooth_wheel_scroll'] },
   { name: 'flutter_otp_widget', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_otp_widget', repo: 'https://github.com/kihyun1998/flutter_otp_widget' },
   { name: 'flutter_root_context_menu', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_root_context_menu', repo: 'https://github.com/kihyun1998/flutter_root_context_menu' },
   { name: 'flutter_show_menu', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_show_menu', repo: 'https://github.com/kihyun1998/flutter_show_menu' },
@@ -72,19 +82,19 @@ export const packages: Package[] = [
   { name: 'window_lockable', ecosystem: 'Flutter', href: 'https://pub.dev/packages/window_lockable', repo: 'https://github.com/kihyun1998/window_lockable' },
   { name: 'boring_avatars', ecosystem: 'Flutter', href: 'https://pub.dev/packages/boring_avatars', repo: 'https://github.com/kihyun1998/boring_avatars' },
   { name: 'ffi_url_launcher', ecosystem: 'Flutter', href: 'https://pub.dev/packages/ffi_url_launcher', repo: 'https://github.com/kihyun1998/ffi_url_launcher' },
-  { name: 'just_sonner', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_sonner', repo: 'https://github.com/kihyun1998/just_sonner' },
-  { name: 'flutter_syntax_highlight', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_syntax_highlight', repo: 'https://github.com/kihyun1998/flutter_syntax_highlight' },
-  { name: 'flutter_example_template', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_example_template', repo: 'https://github.com/kihyun1998/flutter_example_template' },
+  { name: 'just_sonner', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_sonner', repo: 'https://github.com/kihyun1998/just_sonner', uses: ['flutter_smooth_wheel_scroll'] },
+  { name: 'flutter_syntax_highlight', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_syntax_highlight', repo: 'https://github.com/kihyun1998/flutter_syntax_highlight', uses: ['flutter_smooth_wheel_scroll'] },
+  { name: 'flutter_example_template', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_example_template', repo: 'https://github.com/kihyun1998/flutter_example_template', uses: ['flutter_syntax_highlight', 'flutter_smooth_wheel_scroll'] },
   { name: 'flutter_smooth_wheel_scroll', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_smooth_wheel_scroll', repo: 'https://github.com/kihyun1998/flutter_smooth_wheel_scroll' },
 
   // Rust — crates.io
-  { name: 'justpdf', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf', repo: 'https://github.com/kihyun1998/justpdf' },
-  { name: 'justpdf-core', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-core', repo: 'https://github.com/kihyun1998/justpdf' },
-  { name: 'justpdf-render', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-render', repo: 'https://github.com/kihyun1998/justpdf' },
-  { name: 'justpdf-formats', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-formats', repo: 'https://github.com/kihyun1998/justpdf' },
-  { name: 'justpdf-special', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-special', repo: 'https://github.com/kihyun1998/justpdf' },
-  { name: 'justpdf-ffi', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-ffi', repo: 'https://github.com/kihyun1998/justpdf' },
-  { name: 'justpdf-cli', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-cli', repo: 'https://github.com/kihyun1998/justpdf' },
+  { name: 'justpdf', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf', repo: 'https://github.com/kihyun1998/justpdf', uses: ['justpdf-core', 'justpdf-render'] },
+  { name: 'justpdf-core', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-core', repo: 'https://github.com/kihyun1998/justpdf', uses: ['justbig2', 'justjp2'] },
+  { name: 'justpdf-render', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-render', repo: 'https://github.com/kihyun1998/justpdf', uses: ['justpdf-core'] },
+  { name: 'justpdf-formats', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-formats', repo: 'https://github.com/kihyun1998/justpdf', uses: ['justpdf-core', 'justpdf-render'] },
+  { name: 'justpdf-special', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-special', repo: 'https://github.com/kihyun1998/justpdf', uses: ['justpdf-core', 'justpdf-render'] },
+  { name: 'justpdf-ffi', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-ffi', repo: 'https://github.com/kihyun1998/justpdf', uses: ['justpdf-core', 'justpdf-render'] },
+  { name: 'justpdf-cli', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-cli', repo: 'https://github.com/kihyun1998/justpdf', uses: ['justpdf-core', 'justpdf-formats', 'justpdf-render'] },
   { name: 'justbig2', ecosystem: 'Rust', href: 'https://crates.io/crates/justbig2', repo: 'https://github.com/kihyun1998/justbig2' },
   { name: 'justjp2', ecosystem: 'Rust', href: 'https://crates.io/crates/justjp2', repo: 'https://github.com/kihyun1998/justjp2' },
   { name: 'justerm-core', ecosystem: 'Rust', href: 'https://crates.io/crates/justerm-core', repo: 'https://github.com/kihyun1998/justerm' },
@@ -92,7 +102,7 @@ export const packages: Package[] = [
 
   // npm
   { name: 'justpdf-compress-wasm', ecosystem: 'npm', href: 'https://www.npmjs.com/package/@kihyun1998/justpdf-compress-wasm', repo: 'https://github.com/kihyun1998/justpdf' },
-  { name: 'justerm-web', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-web', repo: 'https://github.com/kihyun1998/justerm' },
+  { name: 'justerm-web', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-web', repo: 'https://github.com/kihyun1998/justerm', uses: ['justerm-renderer', 'justerm-wasm-decode'] },
   { name: 'justerm-renderer', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-renderer', repo: 'https://github.com/kihyun1998/justerm' },
   { name: 'justerm-wasm-decode', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-wasm-decode', repo: 'https://github.com/kihyun1998/justerm' },
   { name: 'justable', ecosystem: 'npm', href: 'https://www.npmjs.com/package/@kihyun1998/justable', repo: 'https://github.com/kihyun1998/justable' },
@@ -149,6 +159,9 @@ export type ResolvedFamily = {
 
 const URL_SAFE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+// Fixed routes under /open-source/ that a Family page would shadow.
+const RESERVED_SLUGS = new Set(['dependencies']);
+
 function indexByName(allPackages: Package[]): Map<string, Package> {
   return new Map(allPackages.map((entry) => [entry.name, entry]));
 }
@@ -186,6 +199,11 @@ function assertFamiliesAreWellFormed(
     if (!URL_SAFE_SLUG.test(family.slug)) {
       throw new Error(
         `Family slug "${family.slug}" is not URL-safe (lowercase letters, digits, single hyphens).`,
+      );
+    }
+    if (RESERVED_SLUGS.has(family.slug)) {
+      throw new Error(
+        `Family slug "${family.slug}" is taken by the page at /open-source/${family.slug}.`,
       );
     }
     if (slugs.has(family.slug)) {
@@ -270,3 +288,69 @@ export function resolveFamily(
     members: resolveMembers(family, indexByName(allPackages)),
   };
 }
+
+// One edge of the Dependency Map: `from` uses `to`. `installed` is a
+// Dependency, pulled in with the Package; `example` is an Example Dependency,
+// used only by its example app. See docs/adr/0010-dependency-map.md.
+export type DependencyLink = {
+  from: string;
+  to: string;
+  kind: 'installed' | 'example';
+};
+
+export type DependencyGraph = {
+  // Every Package on either end of a link, in declared order.
+  packages: Package[];
+  links: DependencyLink[];
+  // Every other Package, in declared order. Drawn around the graph, apart.
+  unconnected: Package[];
+};
+
+// Like Family membership, a wrong name here would silently drop an edge from
+// the map, so it throws — at build time, since `dependencyGraph` is derived at
+// module load.
+export function deriveDependencyGraph(
+  allPackages: Package[] = packages,
+): DependencyGraph {
+  const byName = indexByName(allPackages);
+  const links: DependencyLink[] = [];
+
+  for (const entry of allPackages) {
+    const named = [
+      ...(entry.uses ?? []).map((to) => ({ to, kind: 'installed' as const })),
+      ...(entry.exampleUses ?? []).map((to) => ({ to, kind: 'example' as const })),
+    ];
+    const seen = new Set<string>();
+
+    for (const { to, kind } of named) {
+      if (!byName.has(to)) {
+        throw new Error(`"${entry.name}" uses "${to}", which is not in packages.`);
+      }
+      if (byName.get(to)!.ecosystem !== entry.ecosystem) {
+        throw new Error(
+          `"${entry.name}" (${entry.ecosystem}) uses "${to}" (${byName.get(to)!.ecosystem}); the Dependency Map draws one Ecosystem at a time, so a Dependency stays within one.`,
+        );
+      }
+      if (to === entry.name) {
+        throw new Error(`"${entry.name}" lists itself as something it uses.`);
+      }
+      if (seen.has(to)) {
+        throw new Error(
+          `"${entry.name}" lists "${to}" twice; a Package is either a Dependency or an Example Dependency, once.`,
+        );
+      }
+      seen.add(to);
+      links.push({ from: entry.name, to, kind });
+    }
+  }
+
+  const linked = new Set(links.flatMap((link) => [link.from, link.to]));
+  return {
+    packages: allPackages.filter((entry) => linked.has(entry.name)),
+    links,
+    unconnected: allPackages.filter((entry) => !linked.has(entry.name)),
+  };
+}
+
+// The graph the Dependency Map renders. Derived once, at module load.
+export const dependencyGraph: DependencyGraph = deriveDependencyGraph();
