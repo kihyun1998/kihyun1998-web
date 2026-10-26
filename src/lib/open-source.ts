@@ -79,7 +79,6 @@ export const packages: Package[] = [
   { name: 'just_font_scan', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_font_scan', repo: 'https://github.com/kihyun1998/just_font_scan' },
   { name: 'just_save_gallery', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_save_gallery', repo: 'https://github.com/kihyun1998/just_save_gallery' },
   { name: 'just_tooltip', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_tooltip', repo: 'https://github.com/kihyun1998/just_tooltip' },
-  { name: 'window_lockable', ecosystem: 'Flutter', href: 'https://pub.dev/packages/window_lockable', repo: 'https://github.com/kihyun1998/window_lockable' },
   { name: 'boring_avatars', ecosystem: 'Flutter', href: 'https://pub.dev/packages/boring_avatars', repo: 'https://github.com/kihyun1998/boring_avatars' },
   { name: 'ffi_url_launcher', ecosystem: 'Flutter', href: 'https://pub.dev/packages/ffi_url_launcher', repo: 'https://github.com/kihyun1998/ffi_url_launcher' },
   { name: 'just_sonner', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_sonner', repo: 'https://github.com/kihyun1998/just_sonner', uses: ['flutter_smooth_wheel_scroll'] },
