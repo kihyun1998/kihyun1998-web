@@ -1,14 +1,15 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { BackLink, LinkRow, Section } from '@/components/lists';
+import { BackLink, Section } from '@/components/lists';
+import { PackageRow } from '@/components/open-source-row';
 import { families, resolveFamily } from '@/lib/open-source';
 
 // A Family page — the expansion of a collapsed Family row. It lists member
 // Packages and nothing else: no blurb, no per-member description. ADR-0003's
 // reasoning applies one level up. See docs/adr/0007-package-families.md.
 //
-// Members render as ordinary Package rows (Ecosystem tag, registry link), so
-// ADR-0006 still holds for Packages wherever they appear.
+// Members render as ordinary Package rows (Ecosystem tag, registry and repo
+// links), so ADR-0009 holds for Packages wherever they appear.
 
 type Params = { family: string };
 
@@ -51,12 +52,7 @@ export default async function FamilyPage({
     <>
       <Section title={family.name}>
         {family.members.map((member) => (
-          <LinkRow
-            key={member.href}
-            href={member.href}
-            name={member.name}
-            meta={member.ecosystem}
-          />
+          <PackageRow key={member.href} pkg={member} />
         ))}
       </Section>
       <BackLink href="/open-source">← Open Source</BackLink>

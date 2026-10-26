@@ -1,6 +1,6 @@
 ---
 name: adr-0006-link-packages-to-registry
-status: accepted
+status: amended by ADR-0009 (rows now also link the GitHub repo)
 supersedes: reverses the "card links to GitHub repo, not the registry" decision in ADR-0004 / the first grill
 ---
 
