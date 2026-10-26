@@ -7,6 +7,7 @@ import {
   openSourceRows,
   packages,
   resolveFamily,
+  viewOpenSourceList,
   type Ecosystem,
   type Family,
   type Package,
@@ -57,6 +58,7 @@ describe('deriveOpenSourceRows', () => {
       name: 'demo',
       href: '/open-source/demo',
       memberCount: 3,
+      ecosystems: ['Rust', 'npm'],
     });
   });
 
@@ -182,6 +184,91 @@ describe('deriveOpenSourceRows', () => {
     expect(() => deriveOpenSourceRows(fixturePackages, unsafe)).toThrow(
       /slug/i,
     );
+  });
+});
+
+describe('viewOpenSourceList', () => {
+  const rows = deriveOpenSourceRows(fixturePackages, fixtureFamilies);
+  const view = (eco?: string | null, page?: string | null, perPage = 2) =>
+    viewOpenSourceList(rows, { eco, page }, perPage);
+
+  it('opens on All, page 1, in curated order', () => {
+    const result = view();
+
+    expect(result.ecosystem).toBeUndefined();
+    expect(result.page).toBe(1);
+    expect(result.pageCount).toBe(3);
+    expect(names(result.rows)).toEqual(['alpha_widget', 'beta_widget']);
+  });
+
+  it('narrows to one Ecosystem without reordering', () => {
+    const result = view('npm');
+
+    expect(result.ecosystem).toBe('npm');
+    expect(names(result.rows)).toEqual(['demo', 'loose-package']);
+  });
+
+  it('shows a Family under every Ecosystem its members span', () => {
+    expect(names(view('Rust').rows)).toEqual(['demo', 'loose-crate']);
+    expect(names(view('npm').rows)).toContain('demo');
+    expect(names(view('Flutter').rows)).not.toContain('demo');
+  });
+
+  it('counts rows per filter, All first, then Ecosystems by first appearance', () => {
+    expect(view().filters).toEqual([
+      { ecosystem: undefined, count: 5 },
+      { ecosystem: 'Flutter', count: 2 },
+      { ecosystem: 'Rust', count: 2 },
+      { ecosystem: 'npm', count: 2 },
+    ]);
+  });
+
+  it('offers no filter for an Ecosystem with no rows', () => {
+    const flutterOnly = deriveOpenSourceRows(
+      [pkg('alpha_widget', 'Flutter'), pkg('beta_widget', 'Flutter')],
+      [],
+    );
+
+    expect(viewOpenSourceList(flutterOnly, {}).filters).toEqual([
+      { ecosystem: undefined, count: 2 },
+      { ecosystem: 'Flutter', count: 2 },
+    ]);
+  });
+
+  it('slices the requested page', () => {
+    expect(names(view(null, '2').rows)).toEqual(['demo', 'loose-crate']);
+    expect(names(view(null, '3').rows)).toEqual(['loose-package']);
+  });
+
+  it('reports one page when every filtered row fits', () => {
+    expect(view('Rust').pageCount).toBe(1);
+  });
+
+  it('clamps a page past the end to the last page', () => {
+    const result = view(null, '9');
+
+    expect(result.page).toBe(3);
+    expect(names(result.rows)).toEqual(['loose-package']);
+  });
+
+  it('reads a missing, non-numeric or below-1 page as page 1', () => {
+    for (const page of [null, 'abc', '0', '-2', '1.5']) {
+      expect(view(null, page).page).toBe(1);
+    }
+  });
+
+  it('reads an unknown Ecosystem as All', () => {
+    const result = view('Haskell');
+
+    expect(result.ecosystem).toBeUndefined();
+    expect(result.pageCount).toBe(3);
+  });
+
+  it('pages the curated catalogue 15 rows at a time', () => {
+    const result = viewOpenSourceList(openSourceRows, {});
+
+    expect(result.rows).toHaveLength(Math.min(15, openSourceRows.length));
+    expect(result.pageCount).toBe(Math.ceil(openSourceRows.length / 15));
   });
 });
 
