@@ -18,6 +18,7 @@ const pkg = (name: string, ecosystem: Ecosystem): Package => ({
   name,
   ecosystem,
   href: `https://example.test/${name}`,
+  repo: `https://example.test/repo/${name}`,
 });
 
 // A miniature catalogue with the same shape as the real one: an ecosystem
@@ -73,6 +74,7 @@ describe('deriveOpenSourceRows', () => {
       name: 'loose-crate',
       ecosystem: 'Rust',
       href: 'https://example.test/loose-crate',
+      repo: 'https://example.test/repo/loose-crate',
     });
   });
 
@@ -217,6 +219,16 @@ describe('the curated catalogue', () => {
     ).toHaveLength(1);
     expect(resolveFamily('justpdf')?.members.map((m) => m.name)).toContain(
       'justpdf',
+    );
+  });
+
+  it('points monorepo packages at the shared repository, not one named after them', () => {
+    const repoOf = (name: string) =>
+      packages.find((entry) => entry.name === name)?.repo;
+
+    expect(repoOf('justerm-web')).toBe('https://github.com/kihyun1998/justerm');
+    expect(repoOf('justpdf-compress-wasm')).toBe(
+      'https://github.com/kihyun1998/justpdf',
     );
   });
 

@@ -11,8 +11,11 @@
 // Rules:
 // - Hand-curated, not auto-pulled from GitHub. Order is curation, never a sort.
 // - A card shows exactly two things: `name` and `ecosystem`. No description.
-// - Clicking a card goes to `href` — the package's registry page (pub.dev /
-//   crates.io / npm), where install info, docs, and version live.
+// - A card carries two links: `href` — the package's registry page (pub.dev /
+//   crates.io / npm), where install info, docs, and version live — and `repo`,
+//   its source on GitHub. `repo` is written out, never derived from `name`:
+//   packages in a monorepo (justpdf, justerm) share one repository.
+//   See docs/adr/0009-package-rows-link-registry-and-repo.md.
 // - A Package belongs to at most one Family, and is still declared exactly once
 //   in `packages` — a Family references its members by name.
 
@@ -27,7 +30,10 @@ export type Ecosystem = 'Flutter' | 'Rust' | 'npm';
 export type Package = {
   name: string;
   ecosystem: Ecosystem;
+  // Registry page.
   href: string;
+  // GitHub repository.
+  repo: string;
 };
 
 // A group of Packages built to be used together. `members` names entries in
@@ -41,55 +47,55 @@ export type Family = {
 
 export const packages: Package[] = [
   // Flutter — pub.dev
-  { name: 'flutter_bin', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_bin' },
-  { name: 'x509_cert_store', ecosystem: 'Flutter', href: 'https://pub.dev/packages/x509_cert_store' },
-  { name: 'flutter_alone', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_alone' },
-  { name: 'flutter_inactive_timer', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_inactive_timer' },
-  { name: 'flutter_ime', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_ime' },
-  { name: 'flutter_password_input', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_password_input' },
-  { name: 'flutter_license_manager', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_license_manager' },
-  { name: 'flutter_oss_manager', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_oss_manager' },
-  { name: 'flutter_table_plus', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_table_plus' },
-  { name: 'macos_window_toolkit', ecosystem: 'Flutter', href: 'https://pub.dev/packages/macos_window_toolkit' },
-  { name: 'flutter_animation_stepper', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_animation_stepper' },
-  { name: 'flutter_dropdown_button', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_dropdown_button' },
-  { name: 'flutter_checkbox', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_checkbox' },
-  { name: 'flutter_folderview', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_folderview' },
-  { name: 'flutter_otp_widget', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_otp_widget' },
-  { name: 'flutter_root_context_menu', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_root_context_menu' },
-  { name: 'flutter_show_menu', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_show_menu' },
-  { name: 'flutter_tweakcn_generator', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_tweakcn_generator' },
-  { name: 'just_color_picker', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_color_picker' },
-  { name: 'just_font_scan', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_font_scan' },
-  { name: 'just_save_gallery', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_save_gallery' },
-  { name: 'just_tooltip', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_tooltip' },
-  { name: 'window_lockable', ecosystem: 'Flutter', href: 'https://pub.dev/packages/window_lockable' },
-  { name: 'boring_avatars', ecosystem: 'Flutter', href: 'https://pub.dev/packages/boring_avatars' },
-  { name: 'ffi_url_launcher', ecosystem: 'Flutter', href: 'https://pub.dev/packages/ffi_url_launcher' },
-  { name: 'just_sonner', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_sonner' },
-  { name: 'flutter_syntax_highlight', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_syntax_highlight' },
-  { name: 'flutter_example_template', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_example_template' },
-  { name: 'flutter_smooth_wheel_scroll', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_smooth_wheel_scroll' },
+  { name: 'flutter_bin', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_bin', repo: 'https://github.com/kihyun1998/flutter_bin' },
+  { name: 'x509_cert_store', ecosystem: 'Flutter', href: 'https://pub.dev/packages/x509_cert_store', repo: 'https://github.com/kihyun1998/x509_cert_store' },
+  { name: 'flutter_alone', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_alone', repo: 'https://github.com/kihyun1998/flutter_alone' },
+  { name: 'flutter_inactive_timer', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_inactive_timer', repo: 'https://github.com/kihyun1998/flutter_inactive_timer' },
+  { name: 'flutter_ime', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_ime', repo: 'https://github.com/kihyun1998/flutter_ime' },
+  { name: 'flutter_password_input', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_password_input', repo: 'https://github.com/kihyun1998/flutter_password_input' },
+  { name: 'flutter_license_manager', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_license_manager', repo: 'https://github.com/kihyun1998/flutter_license_manager' },
+  { name: 'flutter_oss_manager', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_oss_manager', repo: 'https://github.com/kihyun1998/flutter_oss_manager' },
+  { name: 'flutter_table_plus', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_table_plus', repo: 'https://github.com/kihyun1998/flutter_table_plus' },
+  { name: 'macos_window_toolkit', ecosystem: 'Flutter', href: 'https://pub.dev/packages/macos_window_toolkit', repo: 'https://github.com/kihyun1998/macos_window_toolkit' },
+  { name: 'flutter_animation_stepper', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_animation_stepper', repo: 'https://github.com/kihyun1998/flutter_animation_stepper' },
+  { name: 'flutter_dropdown_button', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_dropdown_button', repo: 'https://github.com/kihyun1998/flutter_dropdown_button' },
+  { name: 'flutter_checkbox', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_checkbox', repo: 'https://github.com/kihyun1998/flutter_checkbox' },
+  { name: 'flutter_folderview', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_folderview', repo: 'https://github.com/kihyun1998/flutter_folderview' },
+  { name: 'flutter_otp_widget', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_otp_widget', repo: 'https://github.com/kihyun1998/flutter_otp_widget' },
+  { name: 'flutter_root_context_menu', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_root_context_menu', repo: 'https://github.com/kihyun1998/flutter_root_context_menu' },
+  { name: 'flutter_show_menu', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_show_menu', repo: 'https://github.com/kihyun1998/flutter_show_menu' },
+  { name: 'flutter_tweakcn_generator', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_tweakcn_generator', repo: 'https://github.com/kihyun1998/flutter_tweakcn_generator' },
+  { name: 'just_color_picker', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_color_picker', repo: 'https://github.com/kihyun1998/just_color_picker' },
+  { name: 'just_font_scan', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_font_scan', repo: 'https://github.com/kihyun1998/just_font_scan' },
+  { name: 'just_save_gallery', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_save_gallery', repo: 'https://github.com/kihyun1998/just_save_gallery' },
+  { name: 'just_tooltip', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_tooltip', repo: 'https://github.com/kihyun1998/just_tooltip' },
+  { name: 'window_lockable', ecosystem: 'Flutter', href: 'https://pub.dev/packages/window_lockable', repo: 'https://github.com/kihyun1998/window_lockable' },
+  { name: 'boring_avatars', ecosystem: 'Flutter', href: 'https://pub.dev/packages/boring_avatars', repo: 'https://github.com/kihyun1998/boring_avatars' },
+  { name: 'ffi_url_launcher', ecosystem: 'Flutter', href: 'https://pub.dev/packages/ffi_url_launcher', repo: 'https://github.com/kihyun1998/ffi_url_launcher' },
+  { name: 'just_sonner', ecosystem: 'Flutter', href: 'https://pub.dev/packages/just_sonner', repo: 'https://github.com/kihyun1998/just_sonner' },
+  { name: 'flutter_syntax_highlight', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_syntax_highlight', repo: 'https://github.com/kihyun1998/flutter_syntax_highlight' },
+  { name: 'flutter_example_template', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_example_template', repo: 'https://github.com/kihyun1998/flutter_example_template' },
+  { name: 'flutter_smooth_wheel_scroll', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_smooth_wheel_scroll', repo: 'https://github.com/kihyun1998/flutter_smooth_wheel_scroll' },
 
   // Rust — crates.io
-  { name: 'justpdf', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf' },
-  { name: 'justpdf-core', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-core' },
-  { name: 'justpdf-render', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-render' },
-  { name: 'justpdf-formats', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-formats' },
-  { name: 'justpdf-special', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-special' },
-  { name: 'justpdf-ffi', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-ffi' },
-  { name: 'justpdf-cli', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-cli' },
-  { name: 'justbig2', ecosystem: 'Rust', href: 'https://crates.io/crates/justbig2' },
-  { name: 'justjp2', ecosystem: 'Rust', href: 'https://crates.io/crates/justjp2' },
-  { name: 'justerm-core', ecosystem: 'Rust', href: 'https://crates.io/crates/justerm-core' },
-  { name: 'justsftp', ecosystem: 'Rust', href: 'https://crates.io/crates/justsftp' },
+  { name: 'justpdf', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf', repo: 'https://github.com/kihyun1998/justpdf' },
+  { name: 'justpdf-core', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-core', repo: 'https://github.com/kihyun1998/justpdf' },
+  { name: 'justpdf-render', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-render', repo: 'https://github.com/kihyun1998/justpdf' },
+  { name: 'justpdf-formats', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-formats', repo: 'https://github.com/kihyun1998/justpdf' },
+  { name: 'justpdf-special', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-special', repo: 'https://github.com/kihyun1998/justpdf' },
+  { name: 'justpdf-ffi', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-ffi', repo: 'https://github.com/kihyun1998/justpdf' },
+  { name: 'justpdf-cli', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-cli', repo: 'https://github.com/kihyun1998/justpdf' },
+  { name: 'justbig2', ecosystem: 'Rust', href: 'https://crates.io/crates/justbig2', repo: 'https://github.com/kihyun1998/justbig2' },
+  { name: 'justjp2', ecosystem: 'Rust', href: 'https://crates.io/crates/justjp2', repo: 'https://github.com/kihyun1998/justjp2' },
+  { name: 'justerm-core', ecosystem: 'Rust', href: 'https://crates.io/crates/justerm-core', repo: 'https://github.com/kihyun1998/justerm' },
+  { name: 'justsftp', ecosystem: 'Rust', href: 'https://crates.io/crates/justsftp', repo: 'https://github.com/kihyun1998/justsftp' },
 
   // npm
-  { name: 'justpdf-compress-wasm', ecosystem: 'npm', href: 'https://www.npmjs.com/package/@kihyun1998/justpdf-compress-wasm' },
-  { name: 'justerm-web', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-web' },
-  { name: 'justerm-renderer', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-renderer' },
-  { name: 'justerm-wasm-decode', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-wasm-decode' },
-  { name: 'justable', ecosystem: 'npm', href: 'https://www.npmjs.com/package/@kihyun1998/justable' },
+  { name: 'justpdf-compress-wasm', ecosystem: 'npm', href: 'https://www.npmjs.com/package/@kihyun1998/justpdf-compress-wasm', repo: 'https://github.com/kihyun1998/justpdf' },
+  { name: 'justerm-web', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-web', repo: 'https://github.com/kihyun1998/justerm' },
+  { name: 'justerm-renderer', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-renderer', repo: 'https://github.com/kihyun1998/justerm' },
+  { name: 'justerm-wasm-decode', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-wasm-decode', repo: 'https://github.com/kihyun1998/justerm' },
+  { name: 'justable', ecosystem: 'npm', href: 'https://www.npmjs.com/package/@kihyun1998/justable', repo: 'https://github.com/kihyun1998/justable' },
 ];
 
 export const families: Family[] = [
