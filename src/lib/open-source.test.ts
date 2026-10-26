@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  deriveDependencyGraph,
   deriveOpenSourceRows,
+  dependencyGraph,
   families,
   openSourceRows,
   packages,
@@ -162,6 +164,16 @@ describe('deriveOpenSourceRows', () => {
     );
   });
 
+  it('rejects the slug the Dependency Map page already uses', () => {
+    const clashing: Family[] = [
+      { slug: 'dependencies', name: 'deps', members: ['demo-core', 'demo-web'] },
+    ];
+
+    expect(() => deriveOpenSourceRows(fixturePackages, clashing)).toThrow(
+      /dependencies/,
+    );
+  });
+
   it('rejects a Family slug that is not URL-safe', () => {
     const unsafe: Family[] = [
       { slug: 'Demo Suite', name: 'demo', members: ['demo-core', 'demo-web'] },
@@ -193,7 +205,112 @@ describe('resolveFamily', () => {
   });
 });
 
+describe('deriveDependencyGraph', () => {
+  const using = (
+    name: string,
+    uses?: string[],
+    exampleUses?: string[],
+  ): Package => ({ ...pkg(name, 'Flutter'), uses, exampleUses });
+
+  const catalogue: Package[] = [
+    using('app_widget', ['base_scroll', 'base_tooltip'], ['demo_shell']),
+    pkg('loner', 'Flutter'),
+    using('demo_shell', ['base_scroll']),
+    pkg('base_scroll', 'Flutter'),
+    pkg('base_tooltip', 'Flutter'),
+  ];
+
+  it('links each user to what it uses, telling installed from example-app use', () => {
+    const { links } = deriveDependencyGraph(catalogue);
+
+    expect(links).toEqual([
+      { from: 'app_widget', to: 'base_scroll', kind: 'installed' },
+      { from: 'app_widget', to: 'base_tooltip', kind: 'installed' },
+      { from: 'app_widget', to: 'demo_shell', kind: 'example' },
+      { from: 'demo_shell', to: 'base_scroll', kind: 'installed' },
+    ]);
+  });
+
+  it('keeps only Packages on either end of a link, in declared order', () => {
+    const graph = deriveDependencyGraph(catalogue);
+
+    expect(graph.packages.map((entry) => entry.name)).toEqual([
+      'app_widget',
+      'demo_shell',
+      'base_scroll',
+      'base_tooltip',
+    ]);
+  });
+
+  it('keeps every other Package as unconnected, in declared order', () => {
+    const graph = deriveDependencyGraph(catalogue);
+
+    expect(graph.unconnected.map((entry) => entry.name)).toEqual(['loner']);
+  });
+
+  it('rejects using a Package that does not exist', () => {
+    expect(() =>
+      deriveDependencyGraph([...catalogue, using('typo_user', ['base_scrol'])]),
+    ).toThrow(/base_scrol/);
+  });
+
+  it('rejects a Package using itself', () => {
+    expect(() =>
+      deriveDependencyGraph([...catalogue, using('ouroboros', ['ouroboros'])]),
+    ).toThrow(/ouroboros/);
+  });
+
+  it('rejects a Dependency across Ecosystems, which no tab of the map could show', () => {
+    expect(() =>
+      deriveDependencyGraph([
+        ...catalogue,
+        { ...pkg('rusty_bridge', 'Rust'), uses: ['base_scroll'] },
+      ]),
+    ).toThrow(/rusty_bridge/);
+  });
+
+  it('rejects the same Package listed twice', () => {
+    expect(() =>
+      deriveDependencyGraph([
+        ...catalogue,
+        using('twice', ['base_scroll'], ['base_scroll']),
+      ]),
+    ).toThrow(/twice/);
+  });
+});
+
 describe('the curated catalogue', () => {
+  it('derives a Dependency graph without violating any rule', () => {
+    expect(() => deriveDependencyGraph()).not.toThrow();
+  });
+
+  it('records flutter_smooth_wheel_scroll as installed by five Packages', () => {
+    const users = dependencyGraph.links.filter(
+      (link) =>
+        link.to === 'flutter_smooth_wheel_scroll' && link.kind === 'installed',
+    );
+
+    expect(users).toHaveLength(5);
+  });
+
+  it('records justpdf-core under six other justpdf crates', () => {
+    const users = dependencyGraph.links.filter(
+      (link) => link.to === 'justpdf-core',
+    );
+
+    expect(users).toHaveLength(6);
+  });
+
+  it('records flutter_example_template as used only by example apps', () => {
+    const kinds = new Set(
+      dependencyGraph.links
+        .filter((link) => link.to === 'flutter_example_template')
+        .map((link) => link.kind),
+    );
+
+    expect([...kinds]).toEqual(['example']);
+  });
+
   it('derives without violating any Family rule', () => {
     expect(() => deriveOpenSourceRows()).not.toThrow();
   });
