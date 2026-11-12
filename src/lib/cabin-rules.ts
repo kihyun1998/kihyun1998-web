@@ -37,6 +37,12 @@ export function lightingFor(stored: StoredTheme, osPrefersDark: boolean): Lighti
   return dark ? 'night' : 'day';
 }
 
+export type Home = 'cabin' | 'reading-home';
+
+// The home the visitor picked with the switch, as stored per browser; null
+// when they never picked.
+export type StoredHome = Home | null;
+
 export type Visitor = {
   // WebGL is available in this browser.
   webgl: boolean;
@@ -44,21 +50,16 @@ export type Visitor = {
   frameTestFailed: boolean;
   // The visitor's device asks for reduced motion.
   reducedMotion: boolean;
-  // The visitor switched to the Reading Home and the choice was stored.
-  choseReadingHome: boolean;
+  choice: StoredHome;
 };
 
-export type Home = 'cabin' | 'reading-home';
-
-// The Cabin only when it can run, ran well, motion is welcome and the visitor
-// did not choose the Reading Home.
+// The Reading Home when the Cabin cannot run or ran too slowly. Otherwise the
+// stored choice; with none stored, the Cabin unless reduced motion is asked
+// for.
 export function homeFor(visitor: Visitor): Home {
-  const cabin =
-    visitor.webgl &&
-    !visitor.frameTestFailed &&
-    !visitor.reducedMotion &&
-    !visitor.choseReadingHome;
-  return cabin ? 'cabin' : 'reading-home';
+  if (!visitor.webgl || visitor.frameTestFailed) return 'reading-home';
+  if (visitor.choice !== null) return visitor.choice;
+  return visitor.reducedMotion ? 'reading-home' : 'cabin';
 }
 
 // A position in the scene, in metres; y is up.

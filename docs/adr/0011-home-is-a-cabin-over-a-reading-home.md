@@ -5,7 +5,7 @@ status: accepted
 
 # The home page is a Cabin laid over a Reading Home
 
-[[adr-0008-home-introduces-the-person]] made the home page's first job introducing the person; a column of sections still read as a catalogue. The home page becomes a **Cabin**: a 3D scene inside a two-seat driverless car, driving, seen from a passenger seat. The visitor looks around it and reaches the site through the **Cabin Screen** on its dashboard. Underneath it, the server still sends the **Reading Home** — the Identity Statement, Open Source and Projects as plain HTML — which crawlers and screen readers read, which a visitor gets when the Cabin cannot run (no WebGL, too slow in its first seconds, or reduced motion requested), and which a visitor can switch to and have remembered.
+[[adr-0008-home-introduces-the-person]] made the home page's first job introducing the person; a column of sections still read as a catalogue. The home page becomes a **Cabin**: a 3D scene inside a two-seat driverless car, driving, seen from a passenger seat. The visitor looks around it and reaches the site through the **Cabin Screen** on its dashboard. Underneath it, the server still sends the **Reading Home** — the Identity Statement, Open Source and Projects as plain HTML — which crawlers and screen readers read, which a visitor gets when the Cabin cannot run (no WebGL, or too slow in its first seconds) or when they ask for reduced motion and have not chosen the Cabin, and which a visitor can switch to and have remembered.
 
 ## Why a cabin
 

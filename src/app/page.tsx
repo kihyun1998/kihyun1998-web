@@ -1,3 +1,4 @@
+import { Cabin } from '@/components/cabin';
 import { IdentityStatement } from '@/components/identity-statement';
 import { Section, LinkRow } from '@/components/lists';
 import { OpenSourceRow } from '@/components/open-source-row';
@@ -45,6 +46,8 @@ export default function Home() {
           />
         ))}
       </Section>
+
+      <Cabin />
     </>
   );
 }
