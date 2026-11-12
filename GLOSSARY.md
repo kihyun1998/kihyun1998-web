@@ -61,6 +61,18 @@ _Avoid_: locale switcher, language picker, i18n (all imply heavier infrastructur
 This site's localization model: English is the canonical source-of-truth; a narrow **Translatable Content** set has Korean translations swappable via the **Language Toggle**; everything outside that set is English-only and unaffected by the toggle. Korean translations may lag English without consequence — English is always the fallback.
 _Avoid_: i18n (too generic), multilingual (implies parity that does not exist)
 
+**Cabin**:
+The home page's 3D scene: the inside of a two-seat, driverless car, seen from a passenger seat while it drives. The visitor looks around it and reaches the site through its **Cabin Screen**. Modelled after a real robotaxi interior but carries no maker's name or mark.
+_Avoid_: room, car, vehicle (the first is the dropped concept; the others name the outside, not the scene)
+
+**Cabin Screen**:
+The single screen standing on the **Cabin**'s dashboard, through which the site is navigated. Its tabs are the home page's sections and its content shows the same rows as the lists. It stays at the real screen's size; pressing it brings the view close.
+_Avoid_: display, monitor, dashboard (the dashboard is what it stands on)
+
+**Reading Home**:
+The home page as a plain document: the **Identity Statement**, the Open Source section and the Projects section. It is what the server sends, what crawlers and screen readers read, what a visitor gets when the **Cabin** cannot run, and what a visitor can switch to from the **Cabin**.
+_Avoid_: lite, lo-fi, fallback page (each describes only one of its roles)
+
 ## Relationships
 
 - This site points to **Blog** via a single outbound link. There is no content sync, no RSS aggregation, no post preview, no MDX.
