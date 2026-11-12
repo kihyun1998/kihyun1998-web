@@ -37,7 +37,8 @@ export const metadata: Metadata = {
 };
 
 // Applied before first paint so the OS theme (or stored override) is set with
-// no flash of the wrong theme. Mirrors the logic in theme-toggle.tsx.
+// no flash of the wrong theme. src/lib/theme.ts reads and changes the class it
+// sets, under the same storage key.
 const themeScript = `
 (function () {
   try {

@@ -223,6 +223,37 @@
     content: 'Loading the Cabin…' / '';
     @apply cabin-loading fixed inset-0 z-40;
   }
+  /* The site header: the wordmark over the nav area. While the Cabin is
+     shown (src/components/cabin.tsx marks <html>), it lies over the Cabin as
+     a bar across the top, in white, the wordmark beside the nav area; the
+     bar itself takes no pointer, so a drag that starts on it reaches the
+     Cabin. */
+  .site-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  html[data-home='cabin'] .site-header {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 45;
+    flex-flow: row wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem 1.5rem;
+    padding: 1.25rem 1.75rem 2.5rem;
+    color: #fff;
+    --foreground: #fff;
+    --muted-foreground: rgb(255 255 255 / 0.85);
+    --border: rgb(255 255 255 / 0.4);
+    --ring: #fff;
+    background: linear-gradient(rgb(0 0 0 / 0.5), transparent);
+    text-shadow: 0 1px 8px rgb(0 0 0 / 0.6);
+    pointer-events: none;
+  }
+  html[data-home='cabin'] .site-header > * {
+    pointer-events: auto;
+  }
   /* Respect reduced-motion: neutralize the color/opacity transitions used
      on links, toggles, and hover states, plus the entrance animation. */
   @media (prefers-reduced-motion: reduce) {

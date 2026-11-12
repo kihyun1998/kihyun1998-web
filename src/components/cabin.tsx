@@ -4,11 +4,16 @@
 // browser the Cabin-or-Reading-Home rule decides whether the Cabin covers the
 // page, and a switch lets the visitor choose and stores the choice. What it
 // draws goes into <body>, outside the page's <main>. It lifts the loading
-// cover the <head> script put up once the Cabin is ready or not coming.
+// cover the <head> script put up once the Cabin is ready or not coming. The
+// Cabin takes its lighting from the theme and the Cabin Screen's language
+// from the Language Toggle, and a nav entry zooms it to that tab; while it is
+// shown, <html> carries HOME_ATTRIBUTE, on which globals.css lifts the site
+// header over it.
 // See docs/adr/0011-home-is-a-cabin-over-a-reading-home.md.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, BookOpen, Car } from 'lucide-react';
 import {
   CHOICE_KEY,
@@ -17,9 +22,17 @@ import {
   coverState,
   liftCover,
 } from '@/lib/cabin-cover';
-import { homeFor, type Home, type StoredHome } from '@/lib/cabin-rules';
+import { homeFor, type Home, type Lighting, type StoredHome } from '@/lib/cabin-rules';
 import type { Cabin as CabinScene } from '@/lib/cabin-scene';
 import { createClientStore } from '@/lib/client-store';
+import { HOME_SECTION_EVENT, sectionFromHash } from '@/lib/home';
+import { isDarkNow, themeStore } from '@/lib/theme';
+import { useLanguage } from '@/components/language';
+
+// On <html> while the Cabin is shown and ready.
+const HOME_ATTRIBUTE = 'data-home';
+
+const lightingNow = (): Lighting => (isDarkNow() ? 'night' : 'day');
 
 const homeStore = createClientStore();
 
@@ -159,24 +172,43 @@ function CabinStage() {
   const scene = useRef<CabinScene | null>(null);
   const [ready, setReady] = useState(false);
   const [zoomed, setZoomed] = useState(false);
+  const router = useRouter();
+  const { language } = useLanguage();
+  const lighting = useSyncExternalStore(themeStore.subscribe, lightingNow, lightingNow);
+  // What the scene starts with when it has loaded: the values of that moment.
+  const latest = useRef({ language, lighting });
+  useEffect(() => {
+    latest.current = { language, lighting };
+    scene.current?.setLanguage(language);
+    scene.current?.setLighting(lighting);
+  }, [language, lighting]);
 
   useEffect(() => {
     let left = false;
     import('@/lib/cabin-scene')
       .then(({ mountCabin }) => {
         if (left || !stage.current) return;
-        scene.current = mountCabin(stage.current, {
-          onReady: () => {
-            liftCover(document.documentElement);
-            setReady(true);
+        scene.current = mountCabin(
+          stage.current,
+          {
+            onReady: () => {
+              liftCover(document.documentElement);
+              setReady(true);
+            },
+            onZoom: setZoomed,
+            onFrameTestFailed: () => write(FRAME_TEST_KEY, 'failed'),
+            onError: (error) => {
+              console.error('The Cabin could not start.', error);
+              giveUp();
+            },
+            onNavigate: (href) => router.push(href),
           },
-          onZoom: setZoomed,
-          onFrameTestFailed: () => write(FRAME_TEST_KEY, 'failed'),
-          onError: (error) => {
-            console.error('The Cabin could not start.', error);
-            giveUp();
+          {
+            ...latest.current,
+            tab: sectionFromHash(window.location.hash),
+            fontFamily: getComputedStyle(document.body).fontFamily,
           },
-        });
+        );
         if (process.env.NODE_ENV !== 'production') {
           (window as unknown as { __cabin?: CabinScene }).__cabin = scene.current;
         }
@@ -190,7 +222,24 @@ function CabinStage() {
       scene.current?.dispose();
       scene.current = null;
     };
+  }, [router]);
+
+  // A nav entry zooms to its tab.
+  useEffect(() => {
+    const show = (event: Event) => {
+      const tab = sectionFromHash(`#${(event as CustomEvent<string>).detail}`);
+      if (tab) scene.current?.showTab(tab);
+    };
+    window.addEventListener(HOME_SECTION_EVENT, show);
+    return () => window.removeEventListener(HOME_SECTION_EVENT, show);
   }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    const root = document.documentElement;
+    root.setAttribute(HOME_ATTRIBUTE, 'cabin');
+    return () => root.removeAttribute(HOME_ATTRIBUTE);
+  }, [ready]);
 
   // The Reading Home underneath does not scroll while the Cabin covers it.
   useEffect(() => {
@@ -214,7 +263,7 @@ function CabinStage() {
         <button
           type="button"
           onClick={() => scene.current?.zoomOut()}
-          className="absolute top-6 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/55 px-3.5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-black/75"
+          className="absolute bottom-4 left-4 z-10 inline-flex items-center sm:left-1/2 sm:-translate-x-1/2 gap-1.5 rounded-full bg-black/55 px-3.5 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-black/75"
         >
           <ArrowLeft className="size-4" aria-hidden />
           Back

@@ -5,7 +5,7 @@ A personal site for Ki Hyun Park. Acts as a public index pointing to his blog (h
 ## Language
 
 **Blog**:
-A personal writing destination hosted *outside* this site. kihyun1998.com references it via a single outbound link; it does not host or render blog posts.
+A personal writing destination hosted *outside* this site. kihyun1998.com references it by outbound links only; it does not host or render blog posts.
 _Avoid_: writing, posts, journal (all imply content lives here)
 
 **Package**:
@@ -70,12 +70,16 @@ The single screen hung in front of the **Cabin**'s dashboard, through which the 
 _Avoid_: display, monitor, dashboard (the dashboard is what it stands on)
 
 **Reading Home**:
-The home page as a plain document: the **Identity Statement**, the Open Source section and the Projects section. It is what the server sends, what crawlers and screen readers read, what a visitor gets when the **Cabin** cannot run, and what a visitor can switch to from the **Cabin**.
+The home page as a plain document: the **Identity Statement**, then the Open Source, Projects, Blog and **Online** sections. It is what the server sends, what crawlers and screen readers read, what a visitor gets when the **Cabin** cannot run, and what a visitor can switch to from the **Cabin**.
 _Avoid_: lite, lo-fi, fallback page (each describes only one of its roles)
+
+**Online**:
+The home page section, and **Cabin Screen** tab, listing where Kihyun is found outside this site: his GitHub profile and the **Blog**.
+_Avoid_: contact, social, links
 
 ## Relationships
 
-- This site points to **Blog** via a single outbound link. There is no content sync, no RSS aggregation, no post preview, no MDX.
+- This site points to **Blog** by outbound links only: one in the nav area, one in the home page's Blog section and one in its **Online** section. There is no content sync, no RSS aggregation, no post preview, no MDX.
 - A **Package** and a **Project** are different things (building block vs. finished service). They are shown in two separate page sections: "Open Source" (Packages) and "Projects". See [[adr-0004-open-source-vs-projects]].
 - Each **Package** row links to two external destinations, as two icon links: its registry page (pub.dev for Flutter, crates.io for Rust, npm for npm), which carries install info, rendered docs, and version; and its GitHub repository. The name itself is not a link. The repo URL is declared per Package, never derived from the name — monorepo members share one repository. See [[adr-0006-link-packages-to-registry]] and [[adr-0009-package-rows-link-registry-and-repo]].
 - Each **Package** card displays exactly two pieces of data: its name and its **Ecosystem** tag. No description, no year, no star count, no status indicator. See [[adr-0003-minimal-project-card]].
@@ -84,13 +88,14 @@ _Avoid_: lite, lo-fi, fallback page (each describes only one of its roles)
 - A **Dependency** is not a **Family**. A Family is a group built to be used together, and a Package joins at most one; Dependencies are pairwise, and a Package may use, and be used by, any number of others. The two are declared independently and neither is inferred from the other. See [[adr-0010-dependency-map]].
 - The **Dependency Map** lives at `/open-source/dependencies` and is reached from the heading of the full Open Source list. Package rows never show their Dependencies — a row still carries only its name and **Ecosystem** tag. See [[adr-0003-minimal-project-card]].
 - Each **Project** card displays its name, linking to its **canonical destination** — the live service URL (e.g. Just MLB → `https://mlb.kihyun1998.com/`) — plus an optional one-line description beneath it. The description is a clause, not a sentence, is length-capped and validated at build time, and is omitted rather than invented when the name says enough. A "kind" label (e.g. "Web App") remains deferred; not shown for now. See [[adr-0008-home-introduces-the-person]].
-- Every section carries a heading set *stronger* than its rows, a **Section Lede** beneath it, and — for every section after the first on a page — a rule above it. The site's Package/Project distinction is its organising idea and has to be visible; it used to be rendered quieter than its own content. The break is drawn with spacing and the existing border token only: no card, no new colour, no motion, no third font.
+- Every section carries a heading set *stronger* than its rows, a **Section Lede** beneath it (the home page's Blog and **Online** sections have none), and — for every section after the first on a page — a rule above it. The site's Package/Project distinction is its organising idea and has to be visible; it used to be rendered quieter than its own content. The break is drawn with spacing and the existing border token only: no card, no new colour, no motion, no third font.
 - A **Package**'s destinations are external (its registry and its repo); a **Family** has exactly one and it is internal (its own page). A Family row is the only row in the "Open Source" list that keeps you on this site. Member rows on a Family page are ordinary Package rows and link out the same way. See [[adr-0009-package-rows-link-registry-and-repo]] and [[adr-0007-package-families]].
 - The home page shows a *curated, capped* subset of each section (currently up to 6). The cap counts *rows*, so a **Family** costs one slot no matter how many **Package**s it holds. Each section always carries a "See all" link to its full-list page (`/open-source`, `/projects`), which renders the entire curated array — not the raw GitHub account. The link shows even when nothing is truncated, so neither full-list page is ever orphaned from the internal link graph. See [[adr-0005-curated-home-full-pages]].
-- The home page is: a brief identity statement at the top, then the "Open Source" section, then the "Projects" section. **Blog** appears only as one outbound link in the nav area — it is not a section of its own.
+- The home page is a **Cabin** laid over a **Reading Home**. The Reading Home is: the **Identity Statement** at the top, then the "Open Source" section, the "Projects" section, a "Blog" section holding the one link to the **Blog**, and an "Online" section. The **Cabin Screen**'s tabs are the same five, About being the Identity Statement, and show the same rows; a **Package** row there opens its registry page only. See [[adr-0011-home-is-a-cabin-over-a-reading-home]].
 - The home page's first job is to introduce *the person*; the two lists are evidence for a claim the page makes first, not the point of the page. This is why the **Identity Statement** is expected to use its three-sentence headroom rather than sit at one. If it ever wants a fourth sentence, that is the signal to build an `/about` page — not to raise the ceiling. See [[adr-0008-home-introduces-the-person]].
-- The wordmark in the nav area is each page's `h1`; section headings are `h2` beneath it, so the document outline matches the visible hierarchy on every route.
-- The nav area holds exactly two outbound links — **Blog** (`https://blog.kihyun1998.com`) and GitHub profile (`https://github.com/kihyun1998`) — plus the **Language Toggle** and a theme toggle. No Twitter, LinkedIn, or email link; anyone needing contact finds it on the GitHub profile.
+- The wordmark in the nav area is each page's `h1`; section headings are `h2` beneath it, so the document outline matches the visible hierarchy on every route. This holds on the home page in the **Cabin** too, where the site header lies over the scene.
+- The nav area holds five internal entries, one per section of the home page (About, Open Source, Projects, Blog, Online), exactly two outbound links — **Blog** (`https://blog.kihyun1998.com`) and GitHub profile (`https://github.com/kihyun1998`) — and the **Language Toggle** and a theme toggle. An entry zooms the **Cabin** to the **Cabin Screen** on that tab; in the **Reading Home**, and from any other page, it reaches that section. No Twitter, LinkedIn, or email link; anyone needing contact finds it on the GitHub profile. See [[adr-0011-home-is-a-cabin-over-a-reading-home]].
+- The theme toggle sets the **Cabin**'s lighting: light is day, dark is night, with the night's dash strip and dome lights on and the **Cabin Screen** in its dark style. With no choice made it follows the OS setting, as the theme does everywhere.
 
 ## Flagged ambiguities
 
