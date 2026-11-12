@@ -7,8 +7,9 @@
 // cover the <head> script put up once the Cabin is ready or not coming. The
 // Cabin takes its lighting from the theme and the Cabin Screen's language
 // from the Language Toggle, and a nav entry zooms it to that tab; while it is
-// shown, <html> carries HOME_ATTRIBUTE, on which globals.css lifts the site
-// header over it.
+// zoomed, the tab the Cabin Screen shows is the shown section the nav entries
+// mark. While it is shown, <html> carries HOME_ATTRIBUTE, on which globals.css
+// lifts the site header over it, and the page under it is inert.
 // See docs/adr/0011-home-is-a-cabin-over-a-reading-home.md.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
@@ -25,7 +26,7 @@ import {
 import { homeFor, type Home, type Lighting, type StoredHome } from '@/lib/cabin-rules';
 import type { Cabin as CabinScene } from '@/lib/cabin-scene';
 import { createClientStore } from '@/lib/client-store';
-import { HOME_SECTION_EVENT, sectionFromHash } from '@/lib/home';
+import { HOME_SECTION_EVENT, sectionFromHash, shownSection } from '@/lib/home';
 import { isDarkNow, themeStore } from '@/lib/theme';
 import { useLanguage } from '@/components/language';
 
@@ -207,11 +208,12 @@ function CabinStage() {
               liftCover(document.documentElement);
               setReady(true);
             },
-            onZoom: (zoomed) => {
-              setZoomed(zoomed);
+            onView: (view) => {
+              setZoomed(view.zoomed);
+              shownSection.set(view);
               // Back at the seat, a section's hash no longer says where the
               // Cabin is.
-              if (!zoomed && window.location.hash) {
+              if (!view.zoomed && window.location.hash) {
                 const { pathname, search } = window.location;
                 window.history.replaceState(window.history.state, '', pathname + search);
               }
@@ -241,6 +243,7 @@ function CabinStage() {
       left = true;
       scene.current?.dispose();
       scene.current = null;
+      shownSection.set(null);
     };
   }, [router]);
 
@@ -259,6 +262,19 @@ function CabinStage() {
     const root = document.documentElement;
     root.setAttribute(HOME_ATTRIBUTE, 'cabin');
     return () => root.removeAttribute(HOME_ATTRIBUTE);
+  }, [ready]);
+
+  // The page under the layer takes no focus and is left out of the
+  // accessibility tree: all of <main> while the Cabin loads, and all of it
+  // but the site header once the header lies over the Cabin.
+  useEffect(() => {
+    const covered = Array.from(document.querySelectorAll<HTMLElement>('main > *')).filter(
+      (element) => !(ready && element.classList.contains('site-header')),
+    );
+    for (const element of covered) element.inert = true;
+    return () => {
+      for (const element of covered) element.inert = false;
+    };
   }, [ready]);
 
   // The Reading Home underneath does not scroll while the Cabin covers it.

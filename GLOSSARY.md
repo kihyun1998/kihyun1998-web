@@ -70,7 +70,7 @@ The single screen hung in front of the **Cabin**'s dashboard, through which the 
 _Avoid_: display, monitor, dashboard (the dashboard is what it stands on)
 
 **Reading Home**:
-The home page as a plain document: the **Identity Statement**, then the Open Source, Projects, Blog and **Online** sections. It is what the server sends, what crawlers and screen readers read, what a visitor gets when the **Cabin** cannot run, and what a visitor can switch to from the **Cabin**.
+The home page as a plain document: the **Identity Statement**, then the Open Source, Projects, Blog and **Online** sections. It is what the server sends, what crawlers read, what a visitor gets when the **Cabin** cannot run, and what a visitor can switch to from the **Cabin**. Screen readers read it wherever it is shown; while the Cabin covers it, it takes no focus and is left out of the page, except under the loading cover before the page's script runs.
 _Avoid_: lite, lo-fi, fallback page (each describes only one of its roles)
 
 **Online**:

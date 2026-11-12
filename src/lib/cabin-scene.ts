@@ -29,7 +29,10 @@ import type { Language } from './i18n';
 export type CabinEvents = {
   // The Cabin is drawn and passed its frame test.
   onReady: () => void;
-  onZoom: (zoomed: boolean) => void;
+  // What the view shows: whether it is zoomed to the Cabin Screen, and the
+  // screen's tab. Reported whenever either changes after the frame test has
+  // passed; until then the view is at the seat and nothing is reported.
+  onView: (view: CabinView) => void;
   // The Cabin ran over the frame budget at its lowest resolution.
   onFrameTestFailed: () => void;
   // The Cabin could not start: no context, an asset that did not load, or a
@@ -38,6 +41,8 @@ export type CabinEvents = {
   // An item leading to a page of this site was pressed on the Cabin Screen.
   onNavigate: (href: string) => void;
 };
+
+export type CabinView = { zoomed: boolean; tab: HomeSectionId };
 
 // What the Cabin starts with. `tab` set means it opens zoomed to the Cabin
 // Screen on that tab. `fontFamily` is the CSS font family the screen's text
@@ -717,6 +722,12 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
       let zoomFrom = 0;
       let zoomStart = 0;
       const near = new THREE.Vector3();
+      let reported: CabinView | null = null;
+      const report = () => {
+        if (reported?.zoomed === zoomed && reported.tab === tab) return;
+        reported = { zoomed, tab };
+        events.onView(reported);
+      };
       const setZoomed = (next: boolean) => {
         if (zoomed === next) return;
         zoomed = next;
@@ -724,13 +735,17 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
         zoomStart = performance.now();
         controls.enabled = !next;
         controls.cursorStyle = next ? 'auto' : 'grab';
-        events.onZoom(next);
+        report();
       };
       zoomOut = () => setZoomed(false);
       show.tab = () => {
         paint();
-        if (ready) setZoomed(true);
-        else zoomAsked = true;
+        if (!ready) {
+          zoomAsked = true;
+          return;
+        }
+        setZoomed(true);
+        report();
       };
 
       const escape = (event: KeyboardEvent) => {
