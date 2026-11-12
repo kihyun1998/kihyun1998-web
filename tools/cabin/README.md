@@ -17,10 +17,16 @@ Intermediate files go to `tools/cabin/out/`, which git ignores. Set `CABIN_OUT` 
 $BLENDER -b --factory-startup --python tools/cabin/cabin.py -- wb
 ```
 
-Writes four Workbench previews: `out/wb_home.png` (the page's opening view: same eye, target and 60° height),
-`out/wb_front.png` (the centred front view of the maker's rider-guide image, seat backs left out), `out/wb_door.png`
-(through the open left door) and `out/wb_corner.png` (a close look at where the right A-pillar meets the headliner). No Cycles, a second or two. Workbench draws no transparency, so the side glass shows as
-opaque dark grey there.
+Writes seven Workbench previews: `out/wb_home.png` (the page's opening view: same eye, target and 60° height),
+`out/wb_front.png` (a centred front view like the maker's rider-guide image, seat backs left out), `out/wb_door.png`
+(through the open left door), `out/wb_corner.png` (a close look at where the right A-pillar meets the headliner),
+`out/wb_rdoor.png` (the right door from the left seat), `out/wb_side.png` (the right door card square on, the left
+side and the seats left out) and `out/wb_dashend.png` (the left end of the dash). No Cycles, a few seconds. Workbench
+draws no transparency, so the side glass shows as opaque dark grey there.
+
+It also prints `MEASURE` lines read from the built meshes: the length from the windscreen base to the B-pillar, the
+door's length and the sill's height at both ends, the doors' face counts, and which meshes reach into the page's eye
+box (`EYE_BOX`, a copy of `EYE_BOUNDS` in `src/lib/cabin-scene.ts`; keep the two the same).
 
 ## 2. Bake on Kaggle
 
@@ -30,8 +36,8 @@ python3 tools/cabin/bake_kaggle.py 1024 64    # a quick look
 ```
 
 Pushes `cabin.py` to the private GPU kernel named in `bake_kaggle.py`, waits for the run (about two minutes), and
-downloads `cabin.glb`, `light_day.hdr`, `light_night.hdr`, four Cycles day renders (`day_home.png`, `day_front.png`,
-`day_door.png`, `day_corner.png`) and the run log into `out/`, and removes the denoised lightmaps of the bake before. Both lightmaps use the Cabin's second UV set; the **Cabin Screen** is a separate object
+downloads `cabin.glb`, `light_day.hdr`, `light_night.hdr`, the seven views as Cycles day renders (`day_home.png` and
+so on) and the run log into `out/`, and removes the denoised lightmaps of the bake before. Both lightmaps use the Cabin's second UV set; the **Cabin Screen** is a separate object
 named `Screen` and is not baked, and the side glass is a separate object named `Glass`, left out of the bake and exported
 with a see-through material.
 

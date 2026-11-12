@@ -90,12 +90,12 @@ const ASSETS = '/cabin/';
 // under the headliner, behind the dashboard and ahead of the seat backs.
 const EYE_BOUNDS: Bounds = {
   min: { x: -0.61, y: 0.82, z: -0.6 },
-  max: { x: 0.61, y: 1.26, z: 0.3 },
+  max: { x: 0.61, y: 1.26, z: -0.07 },
 };
 
 // The seat view the Cabin opens on, as orbit angles in radians.
-const HOME_AZIMUTH = -0.326;
-const HOME_POLAR = 1.266;
+const HOME_AZIMUTH = -0.4876;
+const HOME_POLAR = 1.2123;
 
 const FOV = 60;
 // How much of the view's height and width the Cabin Screen fills when zoomed.
@@ -164,8 +164,8 @@ const GOVERNOR_FRAMES = 5;
 const SKY_RADIUS = 900;
 const FAR = 1500;
 // Where the reflection of the outside is captured from: a seated passenger's
-// eye height at the cabin's centre.
-const REFLECTION_EYE = new THREE.Vector3(0, 1.2, 0);
+// eye height, between the two seats.
+const REFLECTION_EYE = new THREE.Vector3(0, 1.15, -0.2);
 
 const SPEED = 13.9; // m/s
 // The car's speed at animation time `now`, in m/s.
