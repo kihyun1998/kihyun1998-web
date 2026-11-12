@@ -81,6 +81,7 @@ function run({
   const clock = new Clock(now);
   const dispatched: string[] = [];
   const listeners = new Set<() => void>();
+  const contexts = { made: 0 };
   const localStorage = {
     getItem(key: string) {
       if (storage === 'throws') throw new Error('SecurityError');
@@ -98,6 +99,7 @@ function run({
     documentElement: root,
     createElement: () => ({
       getContext: (kind: string) => {
+        contexts.made++;
         if (webgl === 'throws') throw new Error('no canvas');
         return kind === 'webgl2' && webgl ? {} : null;
       },
@@ -131,7 +133,7 @@ function run({
     document.hidden = value;
     for (const listener of [...listeners]) listener();
   };
-  return { root, clock, setHidden, dispatched, listeners };
+  return { root, clock, setHidden, dispatched, listeners, contexts };
 }
 
 const covered = (page: Page) => run(page).root.getAttribute(COVER_ATTRIBUTE) === 'cover';
@@ -152,6 +154,14 @@ describe('coverScript', () => {
   it('leaves the page uncovered without WebGL 2', () => {
     expect(covered({ webgl: false })).toBe(false);
     expect(covered({ webgl: 'throws' })).toBe(false);
+  });
+
+  it('creates no WebGL context when the stored state alone rules the Cabin out', () => {
+    expect(run({ storage: { [CHOICE_KEY]: 'reading-home' } }).contexts.made).toBe(0);
+    expect(run({ storage: { [FRAME_TEST_KEY]: 'failed' } }).contexts.made).toBe(0);
+    expect(run({ reducedMotion: true }).contexts.made).toBe(0);
+    expect(run({}).contexts.made).toBe(1);
+    expect(run({ reducedMotion: true, storage: { [CHOICE_KEY]: 'cabin' } }).contexts.made).toBe(1);
   });
 
   it('covers when localStorage throws, as nothing stored', () => {

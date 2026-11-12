@@ -4,7 +4,6 @@ import {
   fitOrbit,
   homeFor,
   isTap,
-  lightingFor,
   type Bounds,
   type Point,
   type Press,
@@ -69,26 +68,6 @@ describe('isTap', () => {
 
   it('rejects a press held longer than 400 ms', () => {
     expect(isTap(ending({ at: 1401 }))).toBe(false);
-  });
-});
-
-describe('lightingFor', () => {
-  it('lights the cabin for day when the visitor chose the light theme', () => {
-    expect(lightingFor('light', false)).toBe('day');
-  });
-
-  it('lights the cabin for night when the visitor chose the dark theme', () => {
-    expect(lightingFor('dark', true)).toBe('night');
-  });
-
-  it('lets a stored choice win over the OS preference', () => {
-    expect(lightingFor('light', true)).toBe('day');
-    expect(lightingFor('dark', false)).toBe('night');
-  });
-
-  it('follows the OS preference when no choice is stored', () => {
-    expect(lightingFor(null, true)).toBe('night');
-    expect(lightingFor(null, false)).toBe('day');
   });
 });
 

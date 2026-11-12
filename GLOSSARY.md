@@ -46,7 +46,7 @@ A one-to-three-sentence prose introduction at the top of the home page describin
 **Constraints:**
 - The Identity Statement does *not* name specific **Ecosystem**s (Flutter, TypeScript, Rust). Those facts live in the Open Source list, where each **Package** carries its Ecosystem tag. The Identity Statement is about *who* Kihyun is, not *what tools* he uses. Future edits that try to inline ecosystem names should be reverted; if you want to surface the cross-ecosystem fact more loudly, change the Open Source list, not the Identity Statement.
 - The Identity Statement is short by design — currently a single sentence, with a soft ceiling of three. Length growth should be challenged: if a new fact wants to be added, prefer adding it to a Project card or removing an existing fact to keep the total compact.
-- The literal text lives in `src/app/page.tsx`, not in this glossary. This file describes the *role* and *constraints* of the Identity Statement, not its current wording.
+- The literal text lives in `src/lib/i18n.ts`, not in this glossary. This file describes the *role* and *constraints* of the Identity Statement, not its current wording.
 _Avoid_: bio, headline, tagline (these imply other forms; this one has a specific structural role)
 
 **Translatable Content**:

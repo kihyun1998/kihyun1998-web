@@ -62,8 +62,9 @@ function afterVisibleTime(doc: VisibleDocument, limit: number, expire: () => voi
 }
 
 // The blocking <head> script. It asks `homeFor` itself, serialised into the
-// script, with what is known before paint: WebGL 2, the two stored values and
-// the reduced-motion query. Time before the script ran counts as visible
+// script, with what is known before paint: the two stored values and the
+// reduced-motion query first, then WebGL 2, whose context is created only when
+// those leave the Cabin possible. Time before the script ran counts as visible
 // unless the page is hidden when it runs.
 export const coverScript = `
 (function () {
@@ -76,18 +77,20 @@ export const coverScript = `
         return null;
       }
     };
-    var webgl = false;
-    try {
-      webgl = document.createElement('canvas').getContext('webgl2') !== null;
-    } catch (e) {}
+    var decide = ${homeFor.toString()};
     var choice = read(${JSON.stringify(CHOICE_KEY)});
-    var home = (${homeFor.toString()})({
-      webgl: webgl,
+    var visitor = {
+      webgl: true,
       frameTestFailed: read(${JSON.stringify(FRAME_TEST_KEY)}) === 'failed',
       reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
       choice: choice === 'cabin' || choice === 'reading-home' ? choice : null
-    });
-    if (home !== 'cabin') return;
+    };
+    if (decide(visitor) !== 'cabin') return;
+    visitor.webgl = false;
+    try {
+      visitor.webgl = document.createElement('canvas').getContext('webgl2') !== null;
+    } catch (e) {}
+    if (decide(visitor) !== 'cabin') return;
     var root = document.documentElement;
     var name = ${JSON.stringify(COVER_ATTRIBUTE)};
     root.setAttribute(name, 'cover');

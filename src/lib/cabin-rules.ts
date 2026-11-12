@@ -25,17 +25,7 @@ export function isTap({ start, end }: Press): boolean {
   );
 }
 
-// The theme choice as stored per browser; null when the visitor never chose.
-export type StoredTheme = 'light' | 'dark' | null;
-
 export type Lighting = 'day' | 'night';
-
-// Light is day and dark is night; with no stored choice the OS preference
-// stands in for it.
-export function lightingFor(stored: StoredTheme, osPrefersDark: boolean): Lighting {
-  const dark = stored === null ? osPrefersDark : stored === 'dark';
-  return dark ? 'night' : 'day';
-}
 
 export type Home = 'cabin' | 'reading-home';
 

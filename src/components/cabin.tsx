@@ -57,8 +57,7 @@ const write = (key: string, value: string | null) => {
 };
 
 // Whether this browser can run the Cabin: it has WebGL 2, and on this page
-// load the Cabin has neither failed to start nor run out of time. Read first
-// at hydration, when the <head> script may already have given up.
+// load the Cabin has not failed to start.
 let webgl: boolean | null = null;
 let broken = false;
 const canRun = () => {
@@ -68,9 +67,22 @@ const canRun = () => {
     } catch {
       webgl = false;
     }
-    if (coverState(document.documentElement) === 'gave-up') broken = true;
   }
   return webgl && !broken;
+};
+
+// The Cabin was not ready within the cover's limit on this page load: the
+// Reading Home, with the switch, until the visitor presses it. `lateSeen`
+// keeps a give-up recorded on <html> from counting twice.
+let late = false;
+let lateSeen = false;
+const notInTime = () => {
+  if (lateSeen) return;
+  lateSeen = true;
+  console.warn('The Cabin was not ready in time.');
+  late = true;
+  liftCover(document.documentElement);
+  homeStore.notify();
 };
 
 // The Cabin is not coming on this page load: the Reading Home, without the
@@ -87,12 +99,14 @@ const storedChoice = (): StoredHome => {
 };
 
 const homeNow = (): Home =>
-  homeFor({
-    webgl: canRun(),
-    frameTestFailed: read(FRAME_TEST_KEY) === 'failed',
-    reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-    choice: storedChoice(),
-  });
+  late
+    ? 'reading-home'
+    : homeFor({
+        webgl: canRun(),
+        frameTestFailed: read(FRAME_TEST_KEY) === 'failed',
+        reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+        choice: storedChoice(),
+      });
 
 // The server cannot know any of it, so it reports nothing and renders nothing.
 const unknownOnServer = () => null;
@@ -114,12 +128,8 @@ export function Cabin() {
   // the home page lifts the cover.
   useEffect(() => {
     const root = document.documentElement;
-    const notInTime = () => {
-      console.warn('The Cabin was not ready in time.');
-      giveUp();
-    };
     window.addEventListener(COVER_GAVE_UP_EVENT, notInTime);
-    if (coverState(root) === 'gave-up' && !broken) notInTime();
+    if (coverState(root) === 'gave-up') notInTime();
     return () => {
       window.removeEventListener(COVER_GAVE_UP_EVENT, notInTime);
       liftCover(root);
@@ -138,7 +148,9 @@ function Layer({ home }: { home: Home }) {
       <button
         type="button"
         onClick={() => {
-          // Choosing the Cabin runs the frame test again.
+          // Choosing the Cabin runs the frame test again, and tries again
+          // after a load that ran out of time.
+          late = false;
           write(FRAME_TEST_KEY, null);
           write(CHOICE_KEY, 'cabin');
         }}
@@ -195,7 +207,15 @@ function CabinStage() {
               liftCover(document.documentElement);
               setReady(true);
             },
-            onZoom: setZoomed,
+            onZoom: (zoomed) => {
+              setZoomed(zoomed);
+              // Back at the seat, a section's hash no longer says where the
+              // Cabin is.
+              if (!zoomed && window.location.hash) {
+                const { pathname, search } = window.location;
+                window.history.replaceState(window.history.state, '', pathname + search);
+              }
+            },
             onFrameTestFailed: () => write(FRAME_TEST_KEY, 'failed'),
             onError: (error) => {
               console.error('The Cabin could not start.', error);
