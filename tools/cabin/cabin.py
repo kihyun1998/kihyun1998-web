@@ -218,7 +218,7 @@ for j in range(16):
 grid('hood', rows, 'body', 1)
 
 # ---------- floor, partition and the footwell tub under the dash ----------
-TUB_Y0, TUB_Y1, TUB_X = 0.92, 1.64, 0.6
+TUB_Y0, TUB_Y1, TUB_X = 0.92, 1.64, 0.65
 box('floor', (1.6, WS_Y - 0.1 + 0.86, 0.03), (0, (WS_Y - 0.1 - 0.86) / 2, FLOOR), 'carpet', 0.005)
 box('partition', (1.58, 0.06, 1.0), (0, -0.84, FLOOR + 0.5), 'darkGrey', 0.02)
 bm = bmesh.new(); bmesh.ops.create_cube(bm, size=1.0)
