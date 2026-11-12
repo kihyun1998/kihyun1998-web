@@ -4,7 +4,7 @@
     python3 tools/cabin/bake_kaggle.py [size, default 2048] [samples, default 256]
 
 Pushes cabin.py inside a script kernel, waits for the run, and downloads cabin.glb, light_day.hdr,
-light_night.hdr, the two Cycles day renders and the run log into $CABIN_OUT (or out/ beside this file).
+light_night.hdr, the Cycles day renders and the run log into $CABIN_OUT (or out/ beside this file).
 Denoised lightmaps (light_*_dn.hdr) left there by an earlier bake are removed.
 The Kaggle CLI is `kaggle` on PATH, or the path in $KAGGLE.
 """

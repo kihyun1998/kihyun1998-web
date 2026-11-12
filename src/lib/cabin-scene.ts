@@ -44,7 +44,7 @@ export type Cabin = {
 const ASSETS = '/cabin/';
 
 // The box the eye stays in, in the cabin's metres: between the door cards,
-// above the dash line and under the headliner, ahead of the seat backs.
+// under the headliner, behind the dashboard and ahead of the seat backs.
 const EYE_BOUNDS: Bounds = {
   min: { x: -0.61, y: 0.82, z: -0.6 },
   max: { x: 0.61, y: 1.26, z: 0.3 },
@@ -347,7 +347,7 @@ export function mountCabin(container: HTMLElement, events: CabinEvents): Cabin {
     canvas.setAttribute('role', 'img');
     canvas.setAttribute(
       'aria-label',
-      'The view from the passenger seat of a driverless car driving down a street, a screen standing on its dashboard.',
+      'The view from the passenger seat of a driverless car driving down a street, a screen hanging in front of its dashboard.',
     );
     container.appendChild(canvas);
 
@@ -406,6 +406,8 @@ export function mountCabin(container: HTMLElement, events: CabinEvents): Cabin {
           screen = mesh;
           return;
         }
+        // The side glass keeps its own tinted, see-through material and has no lightmap.
+        if (mesh.name === 'Glass') return;
         for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
           const lit = material as THREE.MeshStandardMaterial;
           lit.lightMap = light;

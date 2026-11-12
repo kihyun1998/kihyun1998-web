@@ -66,7 +66,7 @@ The home page's 3D scene: the inside of a two-seat, driverless car, seen from a 
 _Avoid_: room, car, vehicle (the first is the dropped concept; the others name the outside, not the scene)
 
 **Cabin Screen**:
-The single screen standing on the **Cabin**'s dashboard, through which the site is navigated. Its tabs are the home page's sections and its content shows the same rows as the lists. It stays at the real screen's size; pressing it brings the view close.
+The single screen hung in front of the **Cabin**'s dashboard, through which the site is navigated. Its tabs are the home page's sections and its content shows the same rows as the lists. It stays at the real screen's size; pressing it brings the view close.
 _Avoid_: display, monitor, dashboard (the dashboard is what it stands on)
 
 **Reading Home**:
