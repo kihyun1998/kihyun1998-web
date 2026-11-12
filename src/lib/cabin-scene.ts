@@ -62,7 +62,7 @@ const ZOOM_MS = 900;
 
 // The day lightmap's level, on top of its stored scale and the π between a
 // Cycles diffuse bake and three.js irradiance.
-const DAY_LIGHT = 0.8;
+const DAY_LIGHT = 2.7;
 const DAY_REFLECTION = 0.4;
 
 const PIXEL_RATIOS = [1.5, 1.25, 1];
@@ -76,6 +76,14 @@ const TEST_FRAMES = 12;
 // After the test: one frame in this many is timed, over this many timings.
 const GOVERNOR_EVERY = 30;
 const GOVERNOR_FRAMES = 5;
+
+// How far the cameras see, in metres: past the sky, which is a sphere of
+// SKY_RADIUS round the eye.
+const SKY_RADIUS = 900;
+const FAR = 1500;
+// Where the reflection of the outside is captured from: a seated passenger's
+// eye height at the cabin's centre.
+const REFLECTION_EYE = new THREE.Vector3(0, 1.2, 0);
 
 const SPEED = 13.9; // m/s
 const SEGMENT = 360; // the street repeats over this length, in metres
@@ -110,7 +118,7 @@ function buildStreet(): Street {
   scene.environmentIntensity = 0.7;
 
   const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(900, 32, 16),
+    new THREE.SphereGeometry(SKY_RADIUS, 32, 16),
     new THREE.ShaderMaterial({
       side: THREE.BackSide,
       depthWrite: false,
@@ -277,6 +285,17 @@ function buildStreet(): Street {
   return { scene, sky, advance };
 }
 
+// The line in three.js's lightmap and environment chunk that adds the
+// environment's diffuse light, and the chunk without it.
+const ENVIRONMENT_DIFFUSE = 'iblIrradiance += getIBLIrradiance( geometryNormal );';
+const REFLECTION_ONLY_CHUNK = THREE.ShaderChunk.lights_fragment_maps.replace(ENVIRONMENT_DIFFUSE, '');
+
+// Makes a material take its diffuse light from the lightmap alone: the
+// environment map then adds reflections and no diffuse light.
+function reflectionOnly(shader: { fragmentShader: string }) {
+  shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_maps>', REFLECTION_ONLY_CHUNK);
+}
+
 // Frees every geometry, material and texture under `root`.
 function disposeTree(root: THREE.Object3D) {
   root.traverse((object) => {
@@ -321,6 +340,9 @@ export function mountCabin(container: HTMLElement, events: CabinEvents): Cabin {
   }
 
   function start() {
+    if (!THREE.ShaderChunk.lights_fragment_maps.includes(ENVIRONMENT_DIFFUSE)) {
+      throw new Error('three.js no longer has the environment diffuse line the Cabin removes.');
+    }
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     const canvas = renderer.domElement;
     let frame = 0;
@@ -365,7 +387,7 @@ export function mountCabin(container: HTMLElement, events: CabinEvents): Cabin {
 
     const cabinScene = new THREE.Scene();
     cabinScene.environmentIntensity = DAY_REFLECTION;
-    const reflection = pmrem.fromScene(street.scene, 0.04, 0.1, 600);
+    const reflection = pmrem.fromScene(street.scene, 0.04, 0.1, FAR, { position: REFLECTION_EYE });
     cabinScene.environment = reflection.texture;
     cleanups.push(() => {
       disposeTree(cabinScene);
@@ -412,6 +434,8 @@ export function mountCabin(container: HTMLElement, events: CabinEvents): Cabin {
           const lit = material as THREE.MeshStandardMaterial;
           lit.lightMap = light;
           lit.lightMapIntensity = DAY_LIGHT * day.scale * Math.PI;
+          lit.onBeforeCompile = reflectionOnly;
+          lit.customProgramCacheKey = () => 'reflection-only';
         }
       });
       cabinScene.add(cabin);
@@ -424,7 +448,7 @@ export function mountCabin(container: HTMLElement, events: CabinEvents): Cabin {
       const orbit = fitOrbit(EYE_BOUNDS, target);
 
       // The controls own `camera`; the scene is drawn from `view`.
-      const camera = new THREE.PerspectiveCamera(FOV, 1, 0.02, 1500);
+      const camera = new THREE.PerspectiveCamera(FOV, 1, 0.02, FAR);
       camera.position
         .setFromSphericalCoords(
           orbit.radius,
