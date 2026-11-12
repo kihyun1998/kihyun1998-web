@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next';
 import { LanguageProvider } from '@/components/language';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';
+import { coverScript } from '@/lib/cabin-cover';
 import { SITE_ORIGIN } from '@/lib/site';
 import './globals.css';
 
@@ -62,6 +63,9 @@ export default function RootLayout({
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.css"
         />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/* Marks the home page for the Cabin's loading cover before first
+            paint when the Cabin will be attempted. */}
+        <script dangerouslySetInnerHTML={{ __html: coverScript }} />
         {/* AdSense loader. This is the apex domain, and AdSense reviews and
             approves at the *domain* level — subdomains cannot be registered
             separately and inherit the parent's status — so this site is the

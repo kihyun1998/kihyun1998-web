@@ -174,6 +174,12 @@
   }
 }
 
+/* The look of the Cabin's loading state, shared by the <head> cover and the
+   Cabin's own status line. */
+@utility cabin-loading {
+  @apply flex items-center justify-center bg-[#0b0c0e] text-sm text-white/70;
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -204,6 +210,18 @@
   }
   main > *:nth-child(5) {
     animation-delay: 320ms;
+  }
+  /* The Cabin's loading cover, drawn from the first frame while the <head>
+     script's mark reads "cover" (src/lib/cabin-cover.ts), in the look of the
+     Cabin's own loading state. Its text has an empty alternative text; the
+     first `content` is for browsers without that syntax. */
+  html[data-cabin='cover'] {
+    overflow: hidden;
+  }
+  html[data-cabin='cover'] body::before {
+    content: 'Loading the Cabin…';
+    content: 'Loading the Cabin…' / '';
+    @apply cabin-loading fixed inset-0 z-40;
   }
   /* Respect reduced-motion: neutralize the color/opacity transitions used
      on links, toggles, and hover states, plus the entrance animation. */
