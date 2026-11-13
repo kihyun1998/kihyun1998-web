@@ -13,7 +13,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { DRACOLoader, DRACO_GLTF_CONFIG } from 'three/addons/loaders/DRACOLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import manifest from '../../public/cabin/manifest.json';
-import { fitOrbit, isTap, type Bounds, type Lighting, type PressPoint } from './cabin-rules';
+import { fitOrbit, fovFor, isTap, type Bounds, type Lighting, type PressPoint } from './cabin-rules';
 import {
   SCREEN_HEIGHT,
   SCREEN_WIDTH,
@@ -98,6 +98,9 @@ const HOME_AZIMUTH = -0.4876;
 const HOME_POLAR = 1.2123;
 
 const FOV = 60;
+// The least horizontal field of view, in degrees: a narrow (portrait) view
+// widens its vertical field until it sees at least this much across.
+const MIN_FOV_ACROSS = 40;
 // How much of the view's height and width the Cabin Screen fills when zoomed.
 const ZOOM_FILL_HEIGHT = 0.62;
 const ZOOM_FILL_WIDTH = 0.9;
@@ -696,6 +699,7 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
         const height = container.clientHeight;
         renderer.setSize(width, height);
         camera.aspect = view.aspect = width / height;
+        camera.fov = view.fov = fovFor(view.aspect, FOV, MIN_FOV_ACROSS);
         camera.updateProjectionMatrix();
         view.updateProjectionMatrix();
       };
@@ -866,7 +870,7 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
         const eased = progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2;
         zoom = zoomFrom + ((zoomed ? 1 : 0) - zoomFrom) * eased;
         if (zoom > 0) {
-          const tangent = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
+          const tangent = Math.tan(THREE.MathUtils.degToRad(view.fov / 2));
           const reach = Math.max(
             screenSize.y / (2 * tangent * ZOOM_FILL_HEIGHT),
             screenSize.x / (2 * tangent * view.aspect * ZOOM_FILL_WIDTH),

@@ -1,7 +1,7 @@
 // The Cabin's rules as plain functions of their inputs: what counts as a tap
-// on the Cabin Screen, the orbit that keeps the eye inside the cabin, which
-// lighting a theme means, and whether a visitor gets the Cabin or the Reading
-// Home. Nothing here touches the DOM or three.js.
+// on the Cabin Screen, the orbit that keeps the eye inside the cabin, the
+// field of view of a narrow view, which lighting a theme means, and whether a
+// visitor gets the Cabin or the Reading Home. Nothing here touches the DOM or three.js.
 // See docs/adr/0011-home-is-a-cabin-over-a-reading-home.md and
 // docs/map/home-room.md.
 
@@ -119,4 +119,15 @@ export function fitOrbit(bounds: Bounds, target: Point, margin = ORBIT_MARGIN): 
     minPolar,
     maxPolar,
   };
+}
+
+/**
+ * The vertical field of view, in degrees, for a view of `aspect` (width over
+ * height): `fov`, or wider where the view is so narrow that `fov` would see
+ * less than `minAcross` degrees across.
+ */
+export function fovFor(aspect: number, fov: number, minAcross: number): number {
+  const half = (degrees: number) => Math.tan((degrees * Math.PI) / 360);
+  const needed = (2 * Math.atan(half(minAcross) / aspect) * 180) / Math.PI;
+  return Math.max(fov, needed);
 }

@@ -25,7 +25,8 @@ side and the seats left out) and `out/wb_dashend.png` (the left end of the dash)
 draws no transparency, so the side glass shows as opaque dark grey there.
 
 It also prints `MEASURE` lines read from the built meshes: the length from the windscreen base to the B-pillar, the
-door's length and the sill's height at both ends, the doors' face counts, and which meshes reach into the page's eye
+door's length and the sill's height at both ends, the doors' face counts, how many faces of the dash slab's end caps the
+triangulation left out (0 is right), and which meshes reach into the page's eye
 box (`EYE_BOX`, a copy of `EYE_BOUNDS` in `src/lib/cabin-scene.ts`; keep the two the same).
 
 ## 2. Bake on Kaggle

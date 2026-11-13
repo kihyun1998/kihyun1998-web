@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ORBIT_MARGIN,
   fitOrbit,
+  fovFor,
   homeFor,
   isTap,
   type Bounds,
@@ -290,5 +291,26 @@ describe('fitOrbit', () => {
     const target = { x: 0, y: 1.01, z: -0.945 };
 
     expect(() => fitOrbit(crawlSpace, target)).toThrow(/floor and ceiling/);
+  });
+});
+
+describe('fovFor', () => {
+  // The horizontal field of view a vertical one gives at an aspect, in degrees.
+  const across = (fov: number, aspect: number) =>
+    (2 * Math.atan(Math.tan((fov * Math.PI) / 360) * aspect) * 180) / Math.PI;
+
+  it('keeps the vertical field of a wide view', () => {
+    expect(fovFor(1470 / 729, 60, 40)).toBe(60);
+  });
+
+  it('widens a portrait view until it sees the least field across', () => {
+    const fov = fovFor(390 / 844, 60, 40);
+    expect(fov).toBeCloseTo(76.5, 1);
+    expect(across(fov, 390 / 844)).toBeCloseTo(40, 6);
+  });
+
+  it('keeps the vertical field where it already sees exactly the least field across', () => {
+    const aspect = Math.tan((20 * Math.PI) / 180) / Math.tan((30 * Math.PI) / 180);
+    expect(fovFor(aspect, 60, 40)).toBeCloseTo(60, 9);
   });
 });

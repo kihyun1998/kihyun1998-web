@@ -4,7 +4,7 @@
 #                                                                                 diffuse lightmaps, cabin.glb
 # Output goes to $CABIN_OUT, or to out/ beside this file.
 # Blender axes: x right, y forward, z up. glTF export maps (x, y, z) -> three.js (x, z, -y).
-import bpy, bmesh, math, time, os, sys
+import bpy, bmesh, math, mathutils, time, os, sys
 from mathutils import Vector, Matrix
 
 OUT = os.environ.get('CABIN_OUT') or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'out')
@@ -91,15 +91,13 @@ def rrect(w, h, r, k=3):
     return pts
 def sweep(name, path, profile, normal_of, material, sub=0, caps=True):
     """closed 2-D profile (a, b) swept along path: b runs along normal_of(point, tangent) made square to the
-    tangent, a along tangent x normal. A path point may carry a 4th value, a scale applied to the profile, and a
-    5th, which then scales b alone and leaves the 4th to a."""
+    tangent, a along tangent x normal"""
     bm = bmesh.new(); rings = []
-    pts = [Vector(p[:3]) for p in path]; scale = [p[3] if len(p) > 3 else 1.0 for p in path]
-    deep = [p[4] if len(p) > 4 else k for p, k in zip(path, scale)]
+    pts = [Vector(p[:3]) for p in path]
     for i, p in enumerate(pts):
         t = (pts[min(i + 1, len(pts) - 1)] - pts[max(i - 1, 0)]).normalized()
         nv = normal_of(p, t); nv = (nv - t * nv.dot(t)).normalized(); s = t.cross(nv)
-        rings.append([bm.verts.new(p + s * a * scale[i] + nv * b * deep[i]) for a, b in profile])
+        rings.append([bm.verts.new(p + s * a + nv * b) for a, b in profile])
     m = len(profile)
     for r0, r1 in zip(rings, rings[1:]):
         for k in range(m): bm.faces.new((r0[k], r0[(k + 1) % m], r1[(k + 1) % m], r1[k]))
@@ -157,7 +155,7 @@ DOOR_X = 0.77                        # inner face of the door cards' upper band,
 def inset(y):
     """how far the sides draw in toward the front"""
     t = min(1.0, max(0.0, (y - 0.35) / 0.65)); return 0.16 * t * t * (3 - 2 * t)
-EYE = (0.0, -0.2, 1.15)              # what the windscreen's rim turns its face toward
+EYE = (0.0, 0.25, 1.15)              # what the windscreen's rim and the A-pillar bands turn their face toward: between the seats
 
 # The A-pillar's centre line from the dash corner up to the roof, and the roof rail's above the side glass, front to
 # back: together the top line of the side glass.
@@ -243,48 +241,138 @@ for f in bm.faces:
 finish(mesh_from('tub', bm), 'carpet', 0, 0)
 box('dashUnder', (2 * TUB_X, TUB_Y1 - DASH_Y - 0.06, 0.02), (0, (TUB_Y1 + DASH_Y + 0.06) / 2, DASH_LOW + 0.012), 'darkGrey', 0.004)
 
-# ---------- dashboard: a deep flat deck to the windscreen, and the thin layered slab whose ends roll into the doors ----------
+# ---------- dashboard: a deep flat deck to the windscreen, and the thin layered slab across it ----------
 rows = []
 for j in range(9):
     y = DASH_Y + 0.05 + (WS_Y - DASH_Y - 0.05) * j / 8; half = DOOR_X - inset(y) - 0.005
     rows.append([(half * (i / 6 - 1), y, DASH_Z - 0.003 + 0.03 * j / 8) for i in range(13)])
 grid('dashDeck', rows, 'dash', 0, 0.02)
-# the slab's front edge, right half: straight across, ending at the door in a round cap, the profile's height
-# shrinking about its middle (x, y, height above the dash top, the profile's height scale, its depth scale)
-CAP_X, CAP_R = 0.605, (DASH_Z - DASH_LOW) / 2
-SLAB = [(0.0, DASH_Y, 0.0, 1), (0.3, DASH_Y, 0.0, 1)]
-for i in range(11):
-    u = i / 10; k = math.sqrt(max(0.0, 1 - u * u)); k = max(k, 0.12)
-    SLAB.append((CAP_X - CAP_R * (1 - u), DASH_Y, -CAP_R * (1 - k), k, 1))
-SLAB_PATH = [(-p[0], *p[1:]) for p in reversed(SLAB)] + SLAB[1:]
-VENT_PATH = [(x, DASH_Y, 0.0) for x in (-(CAP_X - CAP_R - 0.015), CAP_X - CAP_R - 0.015)]   # the slot stops before the caps
+# the slab: its layered profile swept straight across at full height, the vent slot closing in a round end before
+# each end of the slab, and each end closed by a cap whose rim rounds over with radius SLAB_R
+SLAB_X, SLAB_R = 0.606, 0.025              # the slab's end, against the door card, and the radius of the cap's rim
+SLOT_X, SLOT_L = SLAB_X - 0.04, 0.012      # where the slot's round end finishes, and its length
+LOW = DASH_LOW - DASH_Z
+# profile as (u: depth away from the passengers, z: height below the dash top); points 11-14 are the vent slot's
+SLAB_PROF = [(0.0, -0.012), (0.004, -0.003), (0.014, 0.0), (0.1, 0.0), (0.1, LOW), (0.05, LOW), (0.042, LOW + 0.005), (0.04, -0.128),
+             (0.016, -0.124), (0.012, -0.118), (0.012, -0.09), (0.016, -0.086), (0.042, -0.086), (0.042, -0.068), (0.006, -0.068), (0.0, -0.062)]
+NP = len(SLAB_PROF)
+SLAB_LOWER = range(3, 11)                  # the sides below the slot, in the lower layer's material
+SLOT = (11, 12, 13, 14)                    # the slot's points, from its lower front edge round to its upper one
+ABOVE, BELOW = 15, 10                      # the front face's points next to the slot, above and below it
+def slab_prof(closed):
+    """the profile with the slot closed by the fraction closed: its four points move to the front face's line at the
+    slot's middle height, so the slot's end is round in front view and in plan"""
+    out = list(SLAB_PROF); (ua, za), (ub, zb) = SLAB_PROF[ABOVE], SLAB_PROF[BELOW]
+    mid = (SLAB_PROF[SLOT[0]][1] + SLAB_PROF[SLOT[-1]][1]) / 2
+    for n, i in enumerate(SLOT):
+        z = mid + 0.001 * (n - 1.5); f = (ua + (ub - ua) * (z - za) / (zb - za), z)
+        out[i] = tuple(a + (b - a) * closed for a, b in zip(SLAB_PROF[i], f))
+    return out
+def dense(prof, step=0.004):
+    """the profile's sides cut into pieces no longer than step, each point with the side it starts"""
+    out = []
+    for k, p in enumerate(prof):
+        q = prof[(k + 1) % len(prof)]; n = max(1, math.ceil(math.dist(p, q) / step))
+        out += [((p[0] + (q[0] - p[0]) * i / n, p[1] + (q[1] - p[1]) * i / n), k) for i in range(n)]
+    return out
+def seg_dist(p, a, b):
+    ab = (b[0] - a[0], b[1] - a[1]); t = ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / (ab[0] ** 2 + ab[1] ** 2)
+    t = max(0.0, min(1.0, t)); return math.dist(p, (a[0] + ab[0] * t, a[1] + ab[1] * t))
+def inside_poly(p, poly):
+    c = False
+    for a, b in zip(poly, poly[1:] + poly[:1]):
+        if (a[1] > p[1]) != (b[1] > p[1]) and p[0] < a[0] + (b[0] - a[0]) * (p[1] - a[1]) / (b[1] - a[1]): c = not c
+    return c
+def build_slab():
+    bm = bmesh.new(); dropped = 0
+    full = dense(slab_prof(1.0)); m = len(full)
+    stations = [(0.0, 0.0)]                # (x, how far the slot is closed), right half
+    for i in range(9):     # the slot's end: half an ellipse, SLOT_L long
+        a = math.radians(90 * i / 8); stations.append((SLOT_X - SLOT_L * (1 - math.sin(a)), 1 - math.cos(a)))
+    stations.append((SLAB_X - SLAB_R, 1.0))
+    stations = [(-x, c) for x, c in reversed(stations[1:])] + stations
+    rings = []
+    for x, c in stations:
+        # the slot's points follow the slot; the dense points along the other sides stay put
+        prof = slab_prof(c); pts = []
+        for (u, z), k in full:
+            if k in (BELOW, *SLOT):        # sides touching the slot: carried with their end points
+                fa, fb = slab_prof(1.0)[k], slab_prof(1.0)[(k + 1) % NP]
+                L = math.dist(fa, fb); t = math.dist(fa, (u, z)) / L if L else 0.0
+                pa, pb = prof[k], prof[(k + 1) % NP]; u, z = pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t
+            pts.append(bm.verts.new((x, DASH_Y + u, DASH_Z + z)))
+        rings.append(pts)
+    for r0, r1 in zip(rings, rings[1:]):
+        for j in range(m):
+            f = bm.faces.new((r0[j], r0[(j + 1) % m], r1[(j + 1) % m], r1[j])); f.material_index = int(full[j][1] in SLAB_LOWER)
+    # the end caps: a height field over the profile, rising from the outline along a quarter circle of radius SLAB_R
+    poly = [p for p, _ in full]; sides = slab_prof(1.0)
+    if sum(a[0] * b[1] - b[0] * a[1] for a, b in zip(poly, poly[1:] + poly[:1])) < 0: order = list(range(m))[::-1]
+    else: order = list(range(m))
+    # points in rows along the outline at the heights of the quarter circle, then an even grid where it is flat
+    edges = list(zip(poly, poly[1:] + poly[:1]))
+    def dist(p): return min(seg_dist(p, a, b) for a, b in edges)
+    inner = []
+    def add(p, d):
+        if inside_poly(p, poly) and all(math.dist(p, q) > 0.0012 for q, _ in inner): inner.append((p, d))
+    for th in range(1, 7):
+        want = SLAB_R * (1 - math.cos(math.radians(15 * th)))
+        for j, (a, _) in enumerate(full):
+            b = full[(j + 1) % m][0]; c = full[j - 1][0]
+            t = (b[0] - c[0], b[1] - c[1]); n = math.hypot(*t); nv = (-t[1] / n, t[0] / n)
+            if not inside_poly((a[0] + nv[0] * 1e-4, a[1] + nv[1] * 1e-4), poly): nv = (-nv[0], -nv[1])
+            q = (a[0] + nv[0] * want, a[1] + nv[1] * want)
+            if abs(dist(q) - want) < 0.0005: add(q, want)
+    g = 0.004
+    for i in range(int(0.1 / g) + 2):
+        for j in range(int(-LOW / g) + 2):
+            q = (i * g, -j * g); d = dist(q)
+            if d > SLAB_R + g / 2: add(q, d)
+    vs, _, faces, orig, _, _ = mathutils.geometry.delaunay_2d_cdt([Vector(p) for p in poly] + [Vector(p) for p, _ in inner], [], [order], 1, 1e-6)
+    for s, ring in ((1, rings[-1]), (-1, rings[0])):
+        x0 = s * (SLAB_X - SLAB_R); made = {}
+        def vert(i):
+            if i not in made:
+                o = [k for k in orig[i] if k < m]
+                if o: made[i] = ring[o[0]]
+                else:
+                    p, d = inner[orig[i][0] - m]; h = SLAB_R * math.sqrt(max(0.0, 1 - (1 - min(d / SLAB_R, 1.0)) ** 2))
+                    made[i] = bm.verts.new((x0 + s * h, DASH_Y + p[0], DASH_Z + p[1]))
+            return made[i]
+        for fc in faces:
+            vv = [vert(i) for i in fc]
+            if len(set(vv)) < 3: dropped += 1; continue
+            cu = sum(vs[i][0] for i in fc) / len(fc); cz = sum(vs[i][1] for i in fc) / len(fc)
+            k = min(range(NP), key=lambda k: seg_dist((cu, cz), sides[k], sides[(k + 1) % NP]))
+            try: f = bm.faces.new(vv)
+            except ValueError: dropped += 1; continue
+            f.material_index = int(k in SLAB_LOWER)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    o = finish(mesh_from('dashSlab', bm), 'dashBand', 0, 0); o.data.materials.append(M['darkGrey'])
+    print(f'MEASURE dash end caps: {dropped} faces left out of the triangulation')
+    return o
+build_slab()
+VENT_PATH = [(x, DASH_Y, 0.0) for x in (-(SLOT_X - SLOT_L - 0.002), SLOT_X - SLOT_L - 0.002)]   # the slot's light strip and vent box
 def outward(p, t):
     """horizontal, away from the passengers: the side of the path the slab body lies on"""
     n = Vector((t.y, -t.x, 0)); return n if n.dot(Vector((p.x, 1.0 - p.y + 0.4, 0))) > 0 else -n
-def slab(name, prof, material, lower=None, path=None):
-    slab_path = path or SLAB_PATH
+def slab(name, prof, material, path):
     # across the middle the profile's first axis runs down (tangent +x, normal toward the passengers)
-    o = sweep(name, [(p[0], p[1], DASH_Z + p[2], *p[3:]) for p in slab_path], [(-z, -u) for u, z in prof], lambda p, t: -outward(p, t), material)
-    if lower:   # (material, profile sides): the faces swept from those sides of the profile take a second material
-        o.data.materials.append(M[lower[0]]); m = len(prof)
-        for f in o.data.polygons[:(len(slab_path) - 1) * m]:
-            if f.index % m in lower[1]: f.material_index = 1
-# profile as (u: depth away from the passengers, z: height below the dash top)
-LOW = DASH_LOW - DASH_Z
-slab('dashSlab', [(0.0, -0.012), (0.004, -0.003), (0.014, 0.0), (0.1, 0.0), (0.1, LOW), (0.05, LOW), (0.042, LOW + 0.005), (0.04, -0.128),
-                  (0.016, -0.124), (0.012, -0.118), (0.012, -0.09), (0.016, -0.086), (0.042, -0.086), (0.042, -0.068), (0.006, -0.068), (0.0, -0.062)], 'dashBand', ('darkGrey', range(3, 11)))   # below the vent slot
-# the lower fascia's ends, dark behind the caps
-for s in (-1, 1): box(f'dashEnd{s}', (0.16, 0.08, DASH_Z - DASH_LOW + 0.02), (s * (CAP_X - CAP_R + 0.06), DASH_Y + 0.06, (DASH_Z + DASH_LOW) / 2 - 0.02), 'darkGrey', 0.004)
-slab('dashVent', [(0.034, -0.0845), (0.046, -0.0845), (0.046, -0.0695), (0.034, -0.0695)], 'piano', path=VENT_PATH)
-slab('dashStrip', [(0.029, -0.08), (0.034, -0.08), (0.034, -0.074), (0.029, -0.074)], 'strip', path=VENT_PATH)
+    sweep(name, [(p[0], p[1], DASH_Z + p[2]) for p in path], [(-z, -u) for u, z in prof], lambda p, t: -outward(p, t), material)
+slab('dashVent', [(0.034, -0.0845), (0.046, -0.0845), (0.046, -0.0695), (0.034, -0.0695)], 'piano', VENT_PATH)
+slab('dashStrip', [(0.029, -0.08), (0.034, -0.08), (0.034, -0.074), (0.029, -0.074)], 'strip', VENT_PATH)
 
 # ---------- doors: a dark frame round a large light panel, a wedge armrest block on the panel with the release button ----------
-M['frame'] = mat('frame', '#4b4a48', 0.8); M['insert'] = mat('insert', '#6b655d', 0.85); M['block'] = mat('block', '#757068', 0.6)
+M['frame'] = mat('frame', '#4b4a48', 0.8); M['insert'] = mat('insert', '#7a736a', 0.85); M['block'] = mat('block', '#847e75', 0.6)
+M['blockTop'] = mat('blockTop', '#9a9a95', 0.35)
 DOOR_Y0, DOOR_Y1 = BACK + 0.06, WS_Y - 0.06
 PAN_REAR, PAN_FRONT, PAN_R = -0.10, 0.95, 0.12            # the panel's y extent at armrest height and its corner radius
 BLK_REAR, BLK_FRONT = -0.07, 0.80                          # the block's y extent
 PAN_STEP, BLK_RISE = 0.018, 0.035                          # the width of the panel's step and of the block's rise
+PAN_DEPTH = 0.022                                          # how far the panel sits behind the frame
+BLK_TOP_RISE = 0.012                                       # the width of the block's rise along its top edge
 LEAN = 0.3                                                 # how far the panel's ends lean rearward per metre of height
+SHOULDER_Y, SHOULDER_D = 0.945, 0.045                      # the shoulder's rear face beside the dash end, and how far it stands in
 def door_base(y, z):
     """the card's plain section at y: how far out its face stands at height z"""
     b = belt(y)
@@ -313,36 +401,57 @@ def blk_sdf(y, z):
     d = rbox(yl, z, BLK_REAR, BLK_FRONT + 1.0, z0, z1, 0.03)      # the rear end: small corners
     if y > (BLK_FRONT - (z1 - z0) / 2): d = max(d, rbox(y, z, BLK_REAR - 1.0, BLK_FRONT, z0, z1, (z1 - z0) / 2))   # the nose
     return d
+def blk_rise(y, z):
+    """the width of the block's rise at (y, z): wide below, narrow along the top edge"""
+    z0, z1 = blk_edges(y); return BLK_RISE + (BLK_TOP_RISE - BLK_RISE) * smooth01(((z - z0) / (z1 - z0) - 0.35) / 0.3)
+def blk_depth(y, z):
+    """how far the block stands out of the panel at (y, z): most along its top, its face sloping back below it"""
+    z0, z1 = blk_edges(y); return 0.04 + 0.035 * smooth01((z - z0) / (z1 - z0))
+def blk_crest(y, z): return blk_sdf(y, z) + blk_rise(y, z)
+def band_sdf(y, z):
+    """the bright band along the block's top edge, negative inside: the rise of its upper half"""
+    z0, z1 = blk_edges(y); return max(blk_sdf(y, z), -blk_crest(y, z), (z0 + z1) / 2 - z)
 def slot_sdf(y, z):
-    if y <= BLK_REAR + 0.12 or y >= BLK_FRONT - 0.05: return 0.05
-    top = blk_edges(y)[1]; return max(top - z, z - (top + 0.02))
+    """the finger slot along the block's top, negative inside"""
+    top = blk_edges(y)[1]; return max(top - z, z - (top + 0.02), BLK_REAR + 0.12 - y, y - (BLK_FRONT - 0.05))
+def shoulder(y, z):
+    """how much of the shoulder stands at (y, z), 0 to 1: the door's upper front beside the dash, from under the slab
+    up to the sill, its rear face and edges rounded"""
+    return smooth01((y - SHOULDER_Y + 0.015) / 0.03) * smooth01((z - (DASH_LOW - 0.065)) / 0.05) * smooth01((belt(y) - 0.005 - z) / 0.045)
+def slot_edge(y, z): return slot_sdf(y, z) + 0.006
+def pan_crest(y, z): return pan_sdf(y, z) + PAN_STEP
 def card_x(y, z):
     x = door_base(y, z) - inset(y)
-    x += 0.012 * smooth01(-pan_sdf(y, z) / PAN_STEP)               # the panel sits a step behind the frame
-    x -= 0.050 * smooth01(-blk_sdf(y, z) / BLK_RISE) ** 0.7        # the block stands out
+    x += PAN_DEPTH * smooth01(-pan_sdf(y, z) / PAN_STEP)           # the panel sits a step behind the frame
+    t = min(1.0, max(0.0, -blk_sdf(y, z) / blk_rise(y, z)))
+    x -= blk_depth(y, z) * (1 - (1 - t) ** 2)                      # the block stands out, its edge rounding over
     ds = slot_sdf(y, z)
     if ds < 0: x += 0.012 * smooth01(-ds / 0.006)                  # the finger slot
+    x -= SHOULDER_D * shoulder(y, z)                               # the shoulder at the door's upper front
     return x
 def material_at(y, z):
+    if band_sdf(y, z) < 0: return 3
     if blk_sdf(y, z) < 0: return 2
     return 0 if pan_sdf(y, z) < 0 else 1
 # The card is a height field x(y, z) on an even grid from the floor to the sill. Grid points next to the panel's or
 # the block's outline are moved onto it, so the colours meet along the outline and not along grid steps.
-NY, NZ = 320, 160
-def onto_outline(y, z, reach):
-    """(y, z) moved onto the foot or the crest of the block's rise or of the panel's step where one is within reach,
-    and whether that is a colour boundary"""
-    for f, level in ((blk_sdf, 0.0), (pan_sdf, 0.0), (blk_sdf, -BLK_RISE), (pan_sdf, -PAN_STEP)):
-        d = f(y, z) - level
-        if abs(d) < reach:
-            gy = (f(y + 1e-4, z) - f(y - 1e-4, z)) / 2e-4; gz = (f(y, z + 1e-4) - f(y, z - 1e-4)) / 2e-4; g = gy * gy + gz * gz
-            if g > 0.25: return y - d * gy / g, z - d * gz / g, level == 0.0
+NY, NZ = 320, 320
+def blk_mid(y, z): return blk_sdf(y, z) + 0.5 * blk_rise(y, z)
+def onto_outline(y, z, cy, cz):
+    """(y, z) moved onto the foot or the crest of the block's rise (and the middle of it), of the panel's step or of
+    the finger slot's walls, where one lies within half a grid cell, and whether that is a colour boundary"""
+    for f, boundary in ((blk_sdf, True), (pan_sdf, True), (blk_crest, True), (blk_mid, False), (pan_crest, False), (slot_sdf, False), (slot_edge, False)):
+        d = f(y, z)
+        gy = (f(y + 1e-4, z) - f(y - 1e-4, z)) / 2e-4; gz = (f(y, z + 1e-4) - f(y, z - 1e-4)) / 2e-4; g = gy * gy + gz * gz
+        if g < 0.25: continue
+        if abs(d) < 0.5 * (abs(gy) * cy + abs(gz) * cz):    # half a cell measured across the outline, in the units of f
+            return y - d * gy / g, z - d * gz / g, boundary
     return y, z, False
 CARD = []
 for i in range(NY + 1):
     y = DOOR_Y0 + (DOOR_Y1 - DOOR_Y0) * i / NY; b = belt(y)
     col = [(y, FLOOR + (b - FLOOR) * k / NZ, False) for k in range(NZ + 1)]
-    if 0 < i < NY: col[1:-1] = [onto_outline(*q[:2], 0.5 * (DOOR_Y1 - DOOR_Y0) / NY) for q in col[1:-1]]
+    if 0 < i < NY: col[1:-1] = [onto_outline(*q[:2], (DOOR_Y1 - DOOR_Y0) / NY, (b - FLOOR) / NZ) for q in col[1:-1]]
     CARD.append(col)
 for s in (-1, 1):
     bm = bmesh.new(); V = []
@@ -360,11 +469,21 @@ for s in (-1, 1):
                 c = [sum(CARD[a][b][j] for a, b in tri) / 3 for j in (0, 1)]
                 f = bm.faces.new([V[a][b] for a, b in (tri if s > 0 else tri[::-1])]); f.material_index = material_at(*c)
     o = finish(mesh_from(f'door{s}', bm), 'insert', 0, 0)
-    for n in ('frame', 'block'): o.data.materials.append(M[n])
+    for n in ('frame', 'block', 'blockTop'): o.data.materials.append(M[n])
     # the even grid is far denser than the flat stretches need: faces within half a degree of each other are merged
     md = o.modifiers.new('dc', 'DECIMATE'); md.decimate_type = 'DISSOLVE'; md.angle_limit = math.radians(0.5); md.delimit = {'MATERIAL'}
     o.modifiers.new('tr', 'TRIANGULATE')
-    md = o.modifiers.new('wn', 'WEIGHTED_NORMAL'); md.mode = 'FACE_AREA'; md.weight = 100; md.keep_sharp = True
+    # the merged mesh; each vertex's normal is the height field's slope at it
+    me = bpy.data.meshes.new_from_object(o.evaluated_get(bpy.context.evaluated_depsgraph_get())); o.modifiers.clear(); o.data = me
+    if 'sharp_edge' in me.attributes: me.attributes.remove(me.attributes['sharp_edge'])
+    me.validate(); me.update()
+    normals = []; h = 1e-4
+    for v in me.vertices:
+        y, z = v.co.y, v.co.z
+        if z <= FLOOR + 1e-5 or z >= belt(y) - 1e-5: normals.append(v.normal.copy()); continue
+        a = (card_x(y + h, z) - card_x(y - h, z)) / (2 * h); c = (card_x(y, z + h) - card_x(y, z - h)) / (2 * h)
+        normals.append(Vector((-s, a, c)).normalized())
+    me.normals_split_custom_set_from_vertices(normals)
     ry = BLK_FRONT - 0.09; rz = blk_edges(ry)[1] + 0.004
     box(f'release{s}', (0.010, 0.034, 0.016), (s * (card_x(ry, rz - 0.025) - 0.004), ry, rz), 'piano', 0.004)
 
@@ -535,7 +654,7 @@ M['strip'].node_tree.nodes['Principled BSDF'].inputs['Emission Strength'].defaul
 M['dome'].node_tree.nodes['Principled BSDF'].inputs['Emission Strength'].default_value = 1.5
 lamp = bpy.data.objects.new('street', bpy.data.lights.new('street', 'AREA')); sc.collection.objects.link(lamp)
 lamp.data.energy = 120; lamp.data.size = 1.0; lamp.data.color = (1.0, 0.75, 0.45); lamp.location = (3.0, 0.6, 4.0)
-lamp.rotation_euler = (Vector((0, 0.3, 0.8)) - lamp.location).to_track_quat('-Z', 'Y').to_euler()
+lamp.rotation_euler = (Vector((0, SEAT_Y + 0.3, 0.8)) - lamp.location).to_track_quat('-Z', 'Y').to_euler()
 bake('night')
 for k in ('strip', 'dome'): M[k].node_tree.nodes['Principled BSDF'].inputs['Emission Strength'].default_value = 0
 
