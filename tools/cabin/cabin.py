@@ -1,6 +1,6 @@
 # The Cabin: geometry, Workbench previews, day and night lightmap bakes, GLB export. Run in headless Blender:
-#   blender -b --factory-startup --python cabin.py -- wb                          seven Workbench previews (no Cycles), MEASURE lines
-#   blender -b --factory-startup --python cabin.py -- bake [size] [samples]       Cycles: seven day renders, day + night
+#   blender -b --factory-startup --python cabin.py -- wb                          ten Workbench previews (no Cycles), MEASURE lines
+#   blender -b --factory-startup --python cabin.py -- bake [size] [samples]       Cycles: ten day renders, day + night
 #                                                                                 diffuse lightmaps, cabin.glb
 # Output goes to $CABIN_OUT, or to out/ beside this file.
 # Blender axes: x right, y forward, z up. glTF export maps (x, y, z) -> three.js (x, z, -y).
@@ -207,20 +207,45 @@ for s in (-1, 1):
         rows.append([(s * (xb + (xt - xb) * k / 4 + 0.012 * math.sin(math.pi * k / 4)), y, zb + (zt - zb) * k / 4) for k in range(5)])
     glass.append(grid(f'glass{s}', rows, 'glass', 0, 0, keep=False))
 
-# ---------- body: the long sloping hood and the cowl in front of the windscreen ----------
+# ---------- body: the long sloping hood, the front fenders and the cowl in front of the windscreen ----------
 box('cowl', (1.3, 0.07, 0.02), (0, WS_Y + 0.03, WS_Z + 0.005), 'darkGrey', 0.006)
-rows = []
-for j in range(16):
-    t = j / 15; y = WS_Y + 0.07 + 1.08 * t
-    base = WS_Z + 0.03 - 0.02 * t - 0.33 * t ** 3.4
-    half = 0.86 - 0.18 * (1 - t / 0.35) ** 2 if t < 0.35 else 0.86 - 0.12 * ((t - 0.35) / 0.65) ** 2
-    row = []
-    for i in range(21):
-        x = half * (i / 10 - 1); ax = abs(x) / half * 0.86
-        z = base + 0.045 * math.exp(-((ax - 0.66) / 0.12) ** 2) - (0.3 * ((ax - 0.78) / 0.08) ** 2 if ax > 0.78 else 0)
-        row.append((x, y, z))
-    rows.append(row)
-grid('hood', rows, 'body', 1)
+HOOD_Y, NOSE_Y = WS_Y + 0.07, WS_Y + 1.15      # the hood's rear edge on the centre line, and the nose
+FENDER_Y = GLASS_Y + 0.01                      # the fenders' rear edge, at the door's front cut
+def hood_z(y):
+    """height of the hood on the centre line at y"""
+    t = max(0.0, (y - HOOD_Y) / (NOSE_Y - HOOD_Y)); return WS_Z + 0.03 - 0.02 * t - 0.33 * t ** 3.4
+def body_half(y):
+    """half the body's width at y, across the fenders' sides"""
+    return interp([(FENDER_Y, 0.83), (1.6, 0.855), (1.9, 0.875), (2.2, 0.865), (2.45, 0.82), (2.6, 0.74), (NOSE_Y, 0.68)], y)
+def shoulder_z(y):
+    """height of the fender's crown at y: the hood's crown, coming down at the rear to meet the sill at the door"""
+    return min(hood_z(y) + 0.045, interp([(FENDER_Y, belt(FENDER_Y) - 0.015), (1.47, 0.945), (1.62, 1.01)], y))
+def body_section(y, n_top=14, n_roll=8):
+    """the right half of the body's section at y, centre line outward: the hood rising into the fender's crown,
+    the crown rolling over a quarter ellipse, the side falling to below the sightline"""
+    rx, rz = interp([(FENDER_Y, 0.09), (2.0, 0.12), (NOSE_Y, 0.16)], y), interp([(FENDER_Y, 0.12), (2.0, 0.17), (NOSE_Y, 0.2)], y)
+    H = body_half(y); xs = H - rx; zc = hood_z(y); zs = shoulder_z(y); w = 0.12 / xs
+    pts = []
+    for i in range(n_top + 1):
+        u = 1 - (1 - i / n_top) ** 1.5; pts.append((u * xs, zc + (zs - zc) * math.exp(-((u - 1) / w) ** 2)))
+    for i in range(1, n_roll + 1):
+        a = math.radians(90 * i / n_roll); pts.append((xs + rx * math.sin(a), zs - rz * (1 - math.cos(a))))
+    low = min(0.68, zs - rz - 0.04)
+    for k in (1, 2):
+        pts.append((H - 0.012 * k / 2, zs - rz - (zs - rz - low) * k / 2))
+    return pts
+def body_rear(x):
+    """where the body's rear edge lies at x: behind the cowl in the middle, back to the door's front cut at the sides"""
+    return interp([(0.6, HOOD_Y), (0.665, WS_Y), (0.74, FENDER_Y + 0.03), (0.78, FENDER_Y)], x)
+n_cols = len(body_section(HOOD_Y)); rows = []
+x_rear = [p[0] for p in body_section(HOOD_Y)]      # the columns' x at the rear, which places the rear edge
+for j in range(25):
+    t = j / 24; row = []
+    for c in range(n_cols):
+        y0 = body_rear(x_rear[c]); y = y0 + (NOSE_Y - y0) * t
+        x, z = body_section(y)[c]; row.append((x, y, z))
+    rows.append(mirror(row))
+grid('body', rows, 'body', 1)
 
 # ---------- floor, partition and the footwell tub under the dash ----------
 TUB_Y0, TUB_Y1, TUB_X = 0.92, 1.30, 0.65
@@ -532,8 +557,9 @@ bpy.ops.mesh.primitive_plane_add(size=1, location=(0, SCY, SCZ), rotation=(math.
 scr = bpy.context.object; scr.name = 'Screen'; scr.scale = (SW, SH, 1); scr.data.materials.append(M['screen'])
 scr.select_set(False)
 
-# ---------- cameras: the page's home seat, the reference's front view, a view from the open left door, a close
-# look at the right A-pillar's top corner ----------
+# ---------- cameras: the page's home seat and the orbit's azimuth limits, the reference's front view, a view from the
+# open left door, the right A-pillar's top corner, the right door from the left seat and from across the car, the left
+# end of the dash, the hood and fenders from outside ----------
 def camera(name, loc, target, fov, fit='AUTO'):
     c = bpy.data.objects.new(name, bpy.data.cameras.new(name)); sc.collection.objects.link(c)
     c.data.lens_unit = 'FOV'; c.data.sensor_fit = fit; c.data.angle = math.radians(fov); c.location = loc; c.data.clip_start = 0.02
@@ -546,7 +572,12 @@ CORNER = camera('corner', (-0.2, 0.2, 1.12), (0.62, 0.95, 1.30), 50)
 RDOOR = camera('rdoor', (-0.38, 0.25, 1.12), (0.78, 0.42, 0.72), 82)      # the right door seen from the left seat
 SIDE = camera('side', (-8.0, 0.55, 0.8), (0.0, 0.55, 0.8), 16)            # the right door from across the car, nearly flat
 DASHEND = camera('dashend', (-0.3, 0.45, 1.05), (-0.62, 1.05, 0.86), 50)
-SHOTS = [(HOME, 1470, 729), (FRONT, 1280, 960), (DOOR, 1280, 720), (CORNER, 1280, 960), (RDOOR, 1280, 720), (SIDE, 1600, 800), (DASHEND, 1280, 720)]
+# the orbit's azimuth limits, -0.7616 and 0.7616, at the opening view's polar angle
+LEFT = camera('left', (-0.5525, 0.3655, 1.14), (0, SCY, SCZ), 60, 'VERTICAL')
+RIGHT = camera('right', (0.5525, 0.3655, 1.14), (0, SCY, SCZ), 60, 'VERTICAL')
+OUTSIDE = camera('outside', (-3.0, 5.4, 1.7), (0.1, 1.5, 0.75), 34)      # the front three-quarter view of the maker's exterior image
+SHOTS = [(HOME, 1470, 729), (LEFT, 1470, 729), (RIGHT, 1470, 729), (FRONT, 1280, 960), (DOOR, 1280, 720), (CORNER, 1280, 960),
+         (RDOOR, 1280, 720), (SIDE, 1600, 800), (DASHEND, 1280, 720), (OUTSIDE, 1280, 960)]
 LEFT_SIDE = ('door-1', 'release-1', 'glass-1', 'rail-1', 'bpillar-1')
 SEAT_BACKS = ('back-', 'back0', 'head-', 'head0', 'post', 'partition')   # left out of the front view
 SEATS = ('cush', 'back', 'head', 'post', 'base', 'console', 'armrest', 'armPost', 'cup', 'winSwitch')   # left out of the side view
@@ -558,6 +589,7 @@ def shoot(prefix):
             if o.name in LEFT_SIDE: o.hide_render = c in (DOOR, SIDE)
             if o.name.startswith(SEATS): o.hide_render = (c is SIDE)
             if o.name.startswith(SEAT_BACKS): o.hide_render = c in (FRONT, SIDE)
+            if o.name == 'body': o.hide_render = (c is SIDE)
         sc.camera = c; sc.render.resolution_x, sc.render.resolution_y = w, h
         sc.render.filepath = os.path.join(OUT, f'{prefix}_{c.name}.png')
         t = time.time(); bpy.ops.render.render(write_still=True); print(f'TIME {prefix}_{c.name}_s {time.time() - t:.2f}')

@@ -1,13 +1,13 @@
 {
-  "geometry": "cabin.2b9a64c5.glb",
+  "geometry": "cabin.6cf6f7b8.glb",
   "lightmaps": {
     "day": {
-      "file": "light-day.0830c81a.webp",
+      "file": "light-day.26e0a78e.webp",
       "scale": 1.75
     },
     "night": {
-      "file": "light-night.ae8bc214.webp",
-      "scale": 3.25
+      "file": "light-night.2bbcec5d.webp",
+      "scale": 3.5
     }
   }
 }
