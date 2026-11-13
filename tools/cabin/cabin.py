@@ -138,6 +138,17 @@ def interp(table, x):
     for (x0, y0), (x1, y1) in zip(table, table[1:]):
         if x <= x1: return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
     return table[-1][1]
+def smooth01(t): t = max(0.0, min(1.0, t)); return t * t * (3 - 2 * t)
+def smooth_interp(table, x):
+    """monotone cubic Hermite lookup in [(x, y), ...] sorted by x, harmonic-mean slopes: through every point, no overshoot"""
+    if x <= table[0][0]: return table[0][1]
+    if x >= table[-1][0]: return table[-1][1]
+    X = [p[0] for p in table]; Y = [p[1] for p in table]; n = len(X)
+    d = [(Y[i + 1] - Y[i]) / (X[i + 1] - X[i]) for i in range(n - 1)]
+    m = [d[0]] + [0.0 if d[i - 1] * d[i] <= 0 else 2 / (1 / d[i - 1] + 1 / d[i]) for i in range(1, n - 1)] + [d[-1]]
+    i = max(k for k in range(n - 1) if X[k] <= x); h = X[i + 1] - X[i]; t = (x - X[i]) / h
+    return ((2 * t ** 3 - 3 * t * t + 1) * Y[i] + (t ** 3 - 2 * t * t + t) * h * m[i] + (-2 * t ** 3 + 3 * t * t) * Y[i + 1]
+            + (t ** 3 - t * t) * h * m[i + 1])
 def mirror(pts): return [(-p[0], *p[1:]) for p in reversed(pts)] + [tuple(p) for p in pts[1:]]
 
 # ---------- dimensions (metres; z is height above the road) ----------
@@ -147,6 +158,7 @@ WS_Y, WS_Z = 1.50, 0.935             # windscreen base
 GLASS_Y = 1.37                       # front corner of the side glass, the door's front end at the sill
 BP_Y = -0.04                         # the B-pillar's foot on the sill
 BACK = -0.39                         # the partition behind the seats
+DOOR_Y0, DOOR_Y1 = BACK + 0.06, WS_Y - 0.06     # the door cards' rear and front ends
 def belt(y):
     """height of the sill at y: the top of the door cards and the bottom of the side glass, rising toward the rear"""
     return 0.94 + 0.12 * (GLASS_Y - y) / 1.46
@@ -211,15 +223,18 @@ for s in (-1, 1):
 box('cowl', (1.3, 0.07, 0.02), (0, WS_Y + 0.03, WS_Z + 0.005), 'darkGrey', 0.006)
 HOOD_Y, NOSE_Y = WS_Y + 0.07, WS_Y + 1.15      # the hood's rear edge on the centre line, and the nose
 FENDER_Y = GLASS_Y + 0.01                      # the fenders' rear edge, at the door's front cut
+# The top silhouette of the maker's side view (the fender's crown), read at 0, 0.35, 0.62, 0.80 and 0.97 m ahead of the
+# hood line and at the nose
+SILHOUETTE = [(HOOD_Y, 0.912), (HOOD_Y + 0.35, 0.894), (HOOD_Y + 0.62, 0.823), (HOOD_Y + 0.80, 0.741), (HOOD_Y + 0.97, 0.629), (NOSE_Y, 0.57)]
 def hood_z(y):
-    """height of the hood on the centre line at y"""
-    t = max(0.0, (y - HOOD_Y) / (NOSE_Y - HOOD_Y)); return WS_Z + 0.03 - 0.02 * t - 0.33 * t ** 3.4
+    """height of the hood on the centre line at y: the side view's silhouette at the cowl, 4.5 cm under it once clear of the cowl"""
+    y = max(y, HOOD_Y); return smooth_interp(SILHOUETTE, y) - 0.045 * smooth01((y - HOOD_Y) / 0.35)
 def body_half(y):
     """half the body's width at y, across the fenders' sides"""
     return interp([(FENDER_Y, 0.83), (1.6, 0.855), (1.9, 0.875), (2.2, 0.865), (2.45, 0.82), (2.6, 0.74), (NOSE_Y, 0.68)], y)
 def shoulder_z(y):
-    """height of the fender's crown at y: the hood's crown, coming down at the rear to meet the sill at the door"""
-    return min(hood_z(y) + 0.045, interp([(FENDER_Y, belt(FENDER_Y) - 0.015), (1.47, 0.945), (1.62, 1.01)], y))
+    """height of the fender's crown at y: up from the sill at the door to the A-pillar's foot, then the side view's line"""
+    return smooth_interp([(FENDER_Y, belt(FENDER_Y) - 0.015), (1.47, 0.945)] + SILHOUETTE, y)
 def body_section(y, n_top=14, n_roll=8):
     """the right half of the body's section at y, centre line outward: the hood rising into the fender's crown,
     the crown rolling over a quarter ellipse, the side falling to below the sightline"""
@@ -267,10 +282,13 @@ finish(mesh_from('tub', bm), 'carpet', 0, 0)
 box('dashUnder', (2 * TUB_X, TUB_Y1 - DASH_Y - 0.06, 0.02), (0, (TUB_Y1 + DASH_Y + 0.06) / 2, DASH_LOW + 0.012), 'darkGrey', 0.004)
 
 # ---------- dashboard: a deep flat deck to the windscreen, and the thin layered slab across it ----------
+# in front of the door cards' front end the deck widens to just past the A-pillar band's outer edge, under the cowl's
+# ends
+DECK_X = 0.72
 rows = []
-for j in range(9):
-    y = DASH_Y + 0.05 + (WS_Y - DASH_Y - 0.05) * j / 8; half = DOOR_X - inset(y) - 0.005
-    rows.append([(half * (i / 6 - 1), y, DASH_Z - 0.003 + 0.03 * j / 8) for i in range(13)])
+for y in [DASH_Y + 0.05 + (WS_Y - DASH_Y - 0.05) * j / 8 for j in range(8)] + [DOOR_Y1 + 0.006, WS_Y]:
+    half = DECK_X if y > DOOR_Y1 + 0.003 else DOOR_X - inset(y) - 0.005
+    rows.append([(half * (i / 6 - 1), y, DASH_Z - 0.003 + 0.03 * (y - DASH_Y - 0.05) / (WS_Y - DASH_Y - 0.05)) for i in range(13)])
 grid('dashDeck', rows, 'dash', 0, 0.02)
 # the slab: its layered profile swept straight across at full height, the vent slot closing in a round end before
 # each end of the slab, and each end closed by a cap whose rim rounds over with radius SLAB_R
@@ -390,7 +408,6 @@ slab('dashStrip', [(0.029, -0.08), (0.034, -0.08), (0.034, -0.074), (0.029, -0.0
 # ---------- doors: a dark frame round a large light panel, a wedge armrest block on the panel with the release button ----------
 M['frame'] = mat('frame', '#4b4a48', 0.8); M['insert'] = mat('insert', '#7a736a', 0.85); M['block'] = mat('block', '#847e75', 0.6)
 M['blockTop'] = mat('blockTop', '#9a9a95', 0.35)
-DOOR_Y0, DOOR_Y1 = BACK + 0.06, WS_Y - 0.06
 PAN_REAR, PAN_FRONT, PAN_R = -0.10, 0.95, 0.12            # the panel's y extent at armrest height and its corner radius
 BLK_REAR, BLK_FRONT = -0.07, 0.80                          # the block's y extent
 PAN_STEP, BLK_RISE = 0.018, 0.035                          # the width of the panel's step and of the block's rise
@@ -402,7 +419,6 @@ def door_base(y, z):
     """the card's plain section at y: how far out its face stands at height z"""
     b = belt(y)
     return interp([(FLOOR, 0.79), (FLOOR + 0.05, 0.752), (FLOOR + 0.12, 0.746), (b - 0.10, 0.764), (b - 0.035, DOOR_X), (b, 0.79)], z)
-def smooth01(t): t = max(0.0, min(1.0, t)); return t * t * (3 - 2 * t)
 def rbox(y, z, y0, y1, z0, z1, r):
     """signed distance to a rounded rectangle, negative inside"""
     r = min(r, (z1 - z0) / 2, (y1 - y0) / 2)
