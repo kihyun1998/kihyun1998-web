@@ -46,3 +46,5 @@ next-env.d.ts
 # root-level PNGs only — assets under /public are unaffected
 /*.png
 .mcp.json
+# Cabin bake intermediates (previews, raw GLB, HDR lightmaps); see tools/cabin/README.md
+/tools/cabin/out/

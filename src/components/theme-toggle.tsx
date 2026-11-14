@@ -4,20 +4,12 @@
 // in layout.tsx before paint); this button lets the visitor override it and
 // persists the override in localStorage. Theme is a separate concern from
 // Language: it overrides an environment preference, not declared content, so
-// it has no React context — it just flips the `dark` class on <html>.
+// it has no React context — it lives in the `dark` class on <html>, held by
+// src/lib/theme.ts, which the Cabin reads its lighting from too.
 
 import { useSyncExternalStore } from 'react';
 import { Moon, Sun } from 'lucide-react';
-import { createClientStore } from '@/lib/client-store';
-
-const STORAGE_KEY = 'theme';
-
-const themeStore = createClientStore();
-
-// The resolved theme lives on <html>, not in React state — the blocking script
-// puts it there before paint. Reading it back on every render keeps that class
-// the single source of truth.
-const isDarkNow = () => document.documentElement.classList.contains('dark');
+import { isDarkNow, setDark, themeStore } from '@/lib/theme';
 
 // The server can't know the resolved theme, so it reports nothing and the
 // button renders as a stable placeholder until hydration.
@@ -30,13 +22,6 @@ export function ThemeToggle() {
     unknownOnServer,
   );
 
-  function toggle() {
-    const next = !isDarkNow();
-    document.documentElement.classList.toggle('dark', next);
-    localStorage.setItem(STORAGE_KEY, next ? 'dark' : 'light');
-    themeStore.notify();
-  }
-
   if (isDark === null) {
     return <span className="inline-block size-4" aria-hidden />;
   }
@@ -44,7 +29,7 @@ export function ThemeToggle() {
   return (
     <button
       type="button"
-      onClick={toggle}
+      onClick={() => setDark(!isDarkNow())}
       aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
       className="text-muted-foreground transition-colors hover:text-foreground"
     >

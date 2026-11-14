@@ -28,7 +28,7 @@ export function Section({
   // One English line saying what this section lists. Not Translatable Content.
   lede?: string;
   // When set, renders a "See all →" internal link below the list. The home
-  // page passes this only when the section is truncated.
+  // page passes it for every capped section, truncated or not (ADR-0005).
   seeAllHref?: string;
   // Draws the boundary above this section. Set on every section after the
   // first, so a page of several sections reads as several sections.

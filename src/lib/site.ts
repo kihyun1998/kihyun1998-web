@@ -12,12 +12,12 @@
 //
 // Not here, on purpose:
 //
-// - BLOG_URL and GITHUB_URL live in site-header.tsx. They have one consumer
-//   each, and the header's own comment names them as its contents ("exactly
-//   the two outbound links"). Moving them would relocate a documented
-//   property, not remove a duplicate. If a second consumer appears — a footer
-//   link, a contact page — that is the moment to hoist them, not before.
 // - The AdSense publisher id sits in the layout and in public/ads.txt. The
 //   latter is plain text served to crawlers and cannot import a constant, so
 //   the two cannot be unified; inside TypeScript there is only one.
 export const SITE_ORIGIN = 'https://kihyun1998.com';
+
+// The two outbound destinations of the nav area, also listed by the home
+// page's Blog and Online sections.
+export const BLOG_URL = 'https://blog.kihyun1998.com';
+export const GITHUB_URL = 'https://github.com/kihyun1998';

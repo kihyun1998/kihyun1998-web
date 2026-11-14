@@ -18,8 +18,12 @@ const STORAGE_KEY = 'lang';
 
 const languageStore = createClientStore();
 
+// English when nothing is stored or storage cannot be read.
 const storedLanguage = (): Language => {
-  const stored = localStorage.getItem(STORAGE_KEY);
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem(STORAGE_KEY);
+  } catch {}
   return stored === 'ko' || stored === 'en' ? stored : 'en';
 };
 
@@ -45,7 +49,9 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   );
 
   const toggle = useCallback(() => {
-    localStorage.setItem(STORAGE_KEY, storedLanguage() === 'en' ? 'ko' : 'en');
+    try {
+      localStorage.setItem(STORAGE_KEY, storedLanguage() === 'en' ? 'ko' : 'en');
+    } catch {}
     languageStore.notify();
   }, []);
 
