@@ -1,7 +1,7 @@
 // The Cabin as a three.js scene mounted into an element: the baked cabin drawn
 // over a placeholder street that drives past, in day or night lighting, the
-// orbit around the Cabin Screen, the screen's drawing and its presses, the
-// zoom to the screen and back, and the resolution steps.
+// orbit round a point above the Cabin Screen, the screen's drawing and its
+// presses, the zoom to the screen and back, and the resolution steps.
 // Browser-only; the home page loads it on demand.
 // See docs/adr/0011-home-is-a-cabin-over-a-reading-home.md and
 // docs/map/home-room.md.
@@ -63,7 +63,7 @@ export type Cabin = {
   setLanguage: (language: Language) => void;
   dispose: () => void;
   // Where the cameras are now: the gap between the drawn camera and the
-  // controls' camera and the drawn camera's distance to the target, in
+  // controls' camera and the drawn camera's distance to the orbit's centre, in
   // metres, and the controls' orbit angles, in radians.
   probe: () => {
     gap: number;
@@ -93,9 +93,13 @@ const EYE_BOUNDS: Bounds = {
   max: { x: 0.61, y: 1.26, z: -0.07 },
 };
 
+// How far the orbit's centre, the point the view turns round and looks at
+// from the seat, stands above the Cabin Screen's centre, in metres.
+const ORBIT_LIFT = 0.21;
+
 // The seat view the Cabin opens on, as orbit angles in radians.
-const HOME_AZIMUTH = -0.4876;
-const HOME_POLAR = 1.2123;
+const HOME_AZIMUTH = -0.4568;
+const HOME_POLAR = 1.4653;
 
 const FOV = 60;
 // The least horizontal field of view, in degrees: a narrow (portrait) view
@@ -664,7 +668,9 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
       const screenMesh: THREE.Mesh = screen;
 
       const screenBox = new THREE.Box3().setFromObject(screenMesh);
-      const target = screenBox.getCenter(new THREE.Vector3());
+      const screenCentre = screenBox.getCenter(new THREE.Vector3());
+      const target = screenCentre.clone();
+      target.y += ORBIT_LIFT;
       const screenSize = screenBox.getSize(new THREE.Vector3());
       const orbit = fitOrbit(EYE_BOUNDS, target);
 
@@ -707,7 +713,7 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
       window.addEventListener('resize', resize);
       cleanups.push(() => window.removeEventListener('resize', resize));
 
-      // Pulls `eye` back toward the target until it is inside EYE_BOUNDS.
+      // Pulls `eye` back toward the orbit's centre until it is inside EYE_BOUNDS.
       const keepInside = (eye: THREE.Vector3) => {
         let keep = 1;
         for (const axis of ['x', 'y', 'z'] as const) {
@@ -726,6 +732,7 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
       let zoomFrom = 0;
       let zoomStart = 0;
       const near = new THREE.Vector3();
+      const look = new THREE.Vector3();
       let reported: CabinView | null = null;
       const report = () => {
         if (reported?.zoomed === zoomed && reported.tab === tab) return;
@@ -875,11 +882,11 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
             screenSize.y / (2 * tangent * ZOOM_FILL_HEIGHT),
             screenSize.x / (2 * tangent * view.aspect * ZOOM_FILL_WIDTH),
           );
-          near.copy(target);
+          near.copy(screenCentre);
           near.z += Math.min(reach, orbit.radius);
           view.position.lerp(near, zoom);
         }
-        view.lookAt(target);
+        view.lookAt(look.lerpVectors(target, screenCentre, zoom));
         sway.set(
           Math.sin(now / 1300) * 0.004,
           Math.sin(now / 470) * 0.002 + Math.sin(now / 1900) * 0.002,
