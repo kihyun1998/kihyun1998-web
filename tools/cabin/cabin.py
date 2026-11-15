@@ -584,8 +584,10 @@ def camera(name, loc, target, fov, fit='AUTO'):
     c = bpy.data.objects.new(name, bpy.data.cameras.new(name)); sc.collection.objects.link(c)
     c.data.lens_unit = 'FOV'; c.data.sensor_fit = fit; c.data.angle = math.radians(fov); c.location = loc; c.data.clip_start = 0.02
     c.rotation_euler = (Vector(target) - Vector(loc)).to_track_quat('-Z', 'Y').to_euler(); return c
-# the page's opening view: orbit radius 0.855 m round the screen centre at azimuth -0.4876, polar 1.2123, 60 deg tall
-HOME = camera('home', (-0.375, 0.238, 1.14), (0, SCY, SCZ), 60, 'VERTICAL')
+# the page's opening view: orbit radius 0.855 m round a centre 0.21 m above the screen centre (ORBIT_LIFT) at azimuth
+# -0.4568, polar 1.4653, 60 deg tall
+ORBIT_C = (0, SCY, SCZ + 0.21)
+HOME = camera('home', (-0.375, 0.1819, 1.14), ORBIT_C, 60, 'VERTICAL')
 FRONT = camera('front', (0.0, -0.3, 1.15), (0.0, 1.2, 0.86), 76)
 DOOR = camera('door', (-1.15, -0.1, 1.08), (0.25, 0.95, 0.62), 70)
 CORNER = camera('corner', (-0.2, 0.2, 1.12), (0.62, 0.95, 1.30), 50)
@@ -593,8 +595,8 @@ RDOOR = camera('rdoor', (-0.38, 0.25, 1.12), (0.78, 0.42, 0.72), 82)      # the 
 SIDE = camera('side', (-8.0, 0.55, 0.8), (0.0, 0.55, 0.8), 16)            # the right door from across the car, nearly flat
 DASHEND = camera('dashend', (-0.3, 0.45, 1.05), (-0.62, 1.05, 0.86), 50)
 # the orbit's azimuth limits, -0.7616 and 0.7616, at the opening view's polar angle
-LEFT = camera('left', (-0.5525, 0.3655, 1.14), (0, SCY, SCZ), 60, 'VERTICAL')
-RIGHT = camera('right', (0.5525, 0.3655, 1.14), (0, SCY, SCZ), 60, 'VERTICAL')
+LEFT = camera('left', (-0.5867, 0.3296, 1.14), ORBIT_C, 60, 'VERTICAL')
+RIGHT = camera('right', (0.5867, 0.3296, 1.14), ORBIT_C, 60, 'VERTICAL')
 OUTSIDE = camera('outside', (-3.0, 5.4, 1.7), (0.1, 1.5, 0.75), 34)      # the front three-quarter view of the maker's exterior image
 SHOTS = [(HOME, 1470, 729), (LEFT, 1470, 729), (RIGHT, 1470, 729), (FRONT, 1280, 960), (DOOR, 1280, 720), (CORNER, 1280, 960),
          (RDOOR, 1280, 720), (SIDE, 1600, 800), (DASHEND, 1280, 720), (OUTSIDE, 1280, 960)]

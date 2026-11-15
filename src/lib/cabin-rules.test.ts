@@ -122,6 +122,13 @@ describe('fitOrbit', () => {
   const offCentre: Point = { x: 0.2, y: 1.0, z: -0.945 };
   const underFloor: Point = { x: 0, y: 0.5, z: -0.945 };
   const inside: Point = { x: 0, y: 1.0, z: -0.3 };
+  // The Cabin's eye box and its orbit centre, 0.21 m above the Cabin Screen's
+  // centre, as the page uses them.
+  const seats: Bounds = {
+    min: { x: -0.61, y: 0.82, z: -0.6 },
+    max: { x: 0.61, y: 1.26, z: -0.07 },
+  };
+  const aboveScreen: Point = { x: 0, y: 1.05, z: -0.945 };
   // Side walls too far away to matter.
   const wideCabin: Bounds = {
     min: { ...cabin.min, x: -3 },
@@ -139,6 +146,7 @@ describe('fitOrbit', () => {
     { name: 'the screen of a wide cabin', target: screen, bounds: wideCabin },
     { name: 'a target inside the cabin', target: inside, bounds: cabin },
     { name: 'a target in a hall', target: inside, bounds: hall },
+    { name: 'a centre above the screen', target: aboveScreen, bounds: seats },
   ];
 
   // Where three.js puts the eye for these angles
@@ -215,6 +223,20 @@ describe('fitOrbit', () => {
     expect(orbit.maxPolar).toBeCloseTo(1.701783, 5);
     expect(orbit.maxAzimuth).toBeCloseTo(0.324007, 5);
     expect(orbit.minAzimuth).toBeCloseTo(-0.700890, 5);
+  });
+
+  // Hand-computed from the eye box: the polar limits put the eye at the
+  // ceiling and the floor less the margin (acos of each height over the
+  // radius), the azimuth limits at the side walls with the eye level. The
+  // centre stands above the floor, so the range runs past level.
+  it('looks up past level around a centre above the screen', () => {
+    const orbit = fitOrbit(seats, aboveScreen);
+
+    expect(orbit.radius).toBeCloseTo(0.855, 6);
+    expect(orbit.minPolar).toBeCloseTo(1.346703, 5);
+    expect(orbit.maxPolar).toBeCloseTo(1.818949, 5);
+    expect(orbit.maxAzimuth).toBeCloseTo(0.76157, 5);
+    expect(orbit.minAzimuth).toBeCloseTo(-0.76157, 5);
   });
 
   // With the whole polar range above level, the eye swings widest at the
