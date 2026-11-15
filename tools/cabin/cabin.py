@@ -188,8 +188,13 @@ def pillar_edges(y, half):
 # and the side glass (outer). Across the header, round the corner where the band fans out, down the A-pillar.
 RIM_IN = [(0.0, 0.806, 1.325), (0.22, 0.806, 1.325), (0.42, 0.812, 1.325), (0.52, 0.835, 1.326), (0.575, 0.88, 1.326), (0.618, 0.94, 1.32)]
 RIM_OUT = [(0.0, 0.79, 1.368), (0.22, 0.79, 1.368), (0.47, 0.785, 1.368), (0.62, 0.772, 1.362), (0.70, 0.765, 1.34), (0.74, 0.80, 1.285)]
-for y, half in ((0.97, 0.082), (1.10, 0.078), (1.27, 0.07), (1.44, 0.06)):
+for y, half in ((0.97, 0.082), (1.10, 0.078), (1.27, 0.07)):
     e = pillar_edges(y, half); RIM_IN.append(e[0]); RIM_OUT.append(e[1])
+# The A-pillar's base: ahead of y 1.27 the band widens, its windscreen-side edge sweeping inward along the windscreen
+# base and its glass-side edge running down the side glass's front edge, both ending under the deck and the sill
+BASE_IN = [(0.640, 1.37, 1.05), (0.628, 1.435, 0.995), (0.605, 1.475, 0.963), (0.565, 1.49, 0.944), (0.52, 1.495, 0.905)]
+BASE_OUT = [(0.724, 1.30, 0.98), (0.735, 1.345, 0.955), (0.745, 1.368, 0.93), (0.750, 1.371, 0.91), (0.752, 1.373, 0.89)]
+RIM_IN += BASE_IN; RIM_OUT += BASE_OUT
 ribbon('frame', spline(mirror(RIM_IN), 8), spline(mirror(RIM_OUT), 8), 'lightGrey')
 # The roof rail's band above the side glass: its lower edge carries on from the pillar's glass-side edge, its upper
 # edge lies above the headliner. It starts inside the pillar's top.
@@ -233,8 +238,8 @@ def body_half(y):
     """half the body's width at y, across the fenders' sides"""
     return interp([(FENDER_Y, 0.83), (1.6, 0.855), (1.9, 0.875), (2.2, 0.865), (2.45, 0.82), (2.6, 0.74), (NOSE_Y, 0.68)], y)
 def shoulder_z(y):
-    """height of the fender's crown at y: up from the sill at the door to the A-pillar's foot, then the side view's line"""
-    return smooth_interp([(FENDER_Y, belt(FENDER_Y) - 0.015), (1.47, 0.945)] + SILHOUETTE, y)
+    """height of the fender's crown at y: from under the sill at the door into the side view's line"""
+    return smooth_interp([(FENDER_Y, belt(FENDER_Y) - 0.015)] + SILHOUETTE, y)
 def body_section(y, n_top=14, n_roll=8):
     """the right half of the body's section at y, centre line outward: the hood rising into the fender's crown,
     the crown rolling over a quarter ellipse, the side falling to below the sightline"""
@@ -282,8 +287,7 @@ finish(mesh_from('tub', bm), 'carpet', 0, 0)
 box('dashUnder', (2 * TUB_X, TUB_Y1 - DASH_Y - 0.06, 0.02), (0, (TUB_Y1 + DASH_Y + 0.06) / 2, DASH_LOW + 0.012), 'darkGrey', 0.004)
 
 # ---------- dashboard: a deep flat deck to the windscreen, and the thin layered slab across it ----------
-# in front of the door cards' front end the deck widens to just past the A-pillar band's outer edge, under the cowl's
-# ends
+# in front of the door cards' front end the deck widens behind the A-pillar's base, under the cowl's ends
 DECK_X = 0.72
 rows = []
 for y in [DASH_Y + 0.05 + (WS_Y - DASH_Y - 0.05) * j / 8 for j in range(8)] + [DOOR_Y1 + 0.006, WS_Y]:
