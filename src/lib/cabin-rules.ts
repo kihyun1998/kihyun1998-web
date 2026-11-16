@@ -1,7 +1,8 @@
 // The Cabin's rules as plain functions of their inputs: what counts as a tap
-// on the Cabin Screen, the orbit that keeps the eye inside the cabin, the
-// field of view of a narrow view, which lighting a theme means, and whether a
-// visitor gets the Cabin or the Reading Home. Nothing here touches the DOM or three.js.
+// on the Cabin Screen, the orbit that keeps the eye inside the cabin, whether
+// the eye is near a box, the field of view of a narrow view, which lighting a
+// theme means, and whether a visitor gets the Cabin or the Reading Home.
+// Nothing here touches the DOM or three.js.
 // See docs/adr/0011-home-is-a-cabin-over-a-reading-home.md and
 // docs/map/home-room.md.
 
@@ -119,6 +120,14 @@ export function fitOrbit(bounds: Bounds, target: Point, margin = ORBIT_MARGIN): 
     minPolar,
     maxPolar,
   };
+}
+
+// Whether `point` lies nearer than `reach` to the box `bounds`, measured
+// straight to its nearest face, edge or corner; a point inside is near.
+export function isNear(bounds: Bounds, point: Point, reach: number): boolean {
+  const gap = (axis: keyof Point) =>
+    Math.max(bounds.min[axis] - point[axis], 0, point[axis] - bounds.max[axis]);
+  return Math.hypot(gap('x'), gap('y'), gap('z')) < reach;
 }
 
 /**

@@ -54,6 +54,10 @@ if geo is not None:
         if check('Cabin' in nodes and 'mesh' in nodes.get('Cabin', {}), f'{geo_name}: no mesh node named Cabin'):
             check(all('TEXCOORD_1' in p['attributes'] for p in prims(nodes['Cabin'])),
                   f'{geo_name}: a Cabin primitive has no lightmap UV set (TEXCOORD_1)')
+        for name in ('SeatBackLeft', 'SeatBackRight'):
+            if check(name in nodes and 'mesh' in nodes.get(name, {}), f'{geo_name}: no mesh node named {name}'):
+                check(all('TEXCOORD_1' in p['attributes'] for p in prims(nodes[name])),
+                      f'{geo_name}: a {name} primitive has no lightmap UV set (TEXCOORD_1)')
         if check('Screen' in nodes and 'mesh' in nodes.get('Screen', {}), f'{geo_name}: no mesh node named Screen'):
             check(nodes['Screen']['mesh'] != nodes.get('Cabin', {}).get('mesh'), f'{geo_name}: Screen shares the Cabin mesh')
             check(all('TEXCOORD_0' in p['attributes'] and 'TEXCOORD_1' not in p['attributes'] for p in prims(nodes['Screen'])),
