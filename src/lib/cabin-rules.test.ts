@@ -4,6 +4,7 @@ import {
   fitOrbit,
   fovFor,
   homeFor,
+  isNear,
   isTap,
   type Bounds,
   type Point,
@@ -126,7 +127,7 @@ describe('fitOrbit', () => {
   // centre, as the page uses them.
   const seats: Bounds = {
     min: { x: -0.61, y: 0.82, z: -0.6 },
-    max: { x: 0.61, y: 1.26, z: -0.07 },
+    max: { x: 0.61, y: 1.26, z: 0.07 },
   };
   const aboveScreen: Point = { x: 0, y: 1.05, z: -0.945 };
   // Side walls too far away to matter.
@@ -232,11 +233,11 @@ describe('fitOrbit', () => {
   it('looks up past level around a centre above the screen', () => {
     const orbit = fitOrbit(seats, aboveScreen);
 
-    expect(orbit.radius).toBeCloseTo(0.855, 6);
-    expect(orbit.minPolar).toBeCloseTo(1.346703, 5);
-    expect(orbit.maxPolar).toBeCloseTo(1.818949, 5);
-    expect(orbit.maxAzimuth).toBeCloseTo(0.76157, 5);
-    expect(orbit.minAzimuth).toBeCloseTo(-0.76157, 5);
+    expect(orbit.radius).toBeCloseTo(0.995, 6);
+    expect(orbit.minPolar).toBeCloseTo(1.378662, 5);
+    expect(orbit.maxPolar).toBeCloseTo(1.783451, 5);
+    expect(orbit.maxAzimuth).toBeCloseTo(0.634736, 5);
+    expect(orbit.minAzimuth).toBeCloseTo(-0.634736, 5);
   });
 
   // With the whole polar range above level, the eye swings widest at the
@@ -313,6 +314,35 @@ describe('fitOrbit', () => {
     const target = { x: 0, y: 1.01, z: -0.945 };
 
     expect(() => fitOrbit(crawlSpace, target)).toThrow(/floor and ceiling/);
+  });
+});
+
+describe('isNear', () => {
+  const seatBack: Bounds = {
+    min: { x: 0.08, y: 0.44, z: -0.12 },
+    max: { x: 0.67, y: 1.21, z: 0.2 },
+  };
+
+  it('counts a point inside the box as near', () => {
+    expect(isNear(seatBack, { x: 0.375, y: 1.14, z: 0 }, 0.1)).toBe(true);
+  });
+
+  it('measures from the nearest face', () => {
+    expect(isNear(seatBack, { x: 0.0, y: 1.0, z: 0 }, 0.1)).toBe(true);
+    expect(isNear(seatBack, { x: -0.03, y: 1.0, z: 0 }, 0.1)).toBe(false);
+  });
+
+  // 0.06 m past two faces is 0.085 m from their edge, 0.08 m past them 0.113 m.
+  it('measures straight to the nearest edge or corner, not along each axis', () => {
+    expect(isNear(seatBack, { x: 0.02, y: 1.27, z: 0 }, 0.1)).toBe(true);
+    expect(isNear(seatBack, { x: 0.0, y: 1.29, z: 0 }, 0.1)).toBe(false);
+    expect(isNear(seatBack, { x: 0.0, y: 1.29, z: 0.28 }, 0.15)).toBe(true);
+  });
+
+  it('counts a point exactly the reach away as not near', () => {
+    const unit: Bounds = { min: { x: 0, y: 0, z: 0 }, max: { x: 1, y: 1, z: 1 } };
+    expect(isNear(unit, { x: 0.5, y: 0.5, z: 1.25 }, 0.25)).toBe(false);
+    expect(isNear(unit, { x: 0.5, y: 0.5, z: 1.25 }, 0.2501)).toBe(true);
   });
 });
 

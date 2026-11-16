@@ -18,7 +18,8 @@ $BLENDER -b --factory-startup --python tools/cabin/cabin.py -- wb
 ```
 
 Writes ten Workbench previews: `out/wb_home.png` (the page's opening view: same eye, target and 60° height),
-`out/wb_left.png` and `out/wb_right.png` (the orbit's left and right limits at the opening view's height),
+`out/wb_left.png` and `out/wb_right.png` (the orbit's left and right limits at the opening view's height; these three
+hide the seat backs the page hides from that eye, by `SEAT_BACK_NEAR`, a copy of the page's; keep the two the same),
 `out/wb_front.png` (a centred front view like the maker's rider-guide image, seat backs left out), `out/wb_door.png`
 (through the open left door), `out/wb_corner.png` (a close look at where the right A-pillar meets the headliner),
 `out/wb_rdoor.png` (the right door from the left seat), `out/wb_side.png` (the right door card square on, the left
@@ -29,7 +30,8 @@ draws no transparency, so the side glass shows as opaque dark grey there.
 It also prints `MEASURE` lines read from the built meshes: the length from the windscreen base to the B-pillar, the
 door's length and the sill's height at both ends, the doors' face counts, how many faces of the dash slab's end caps the
 triangulation left out (0 is right), and which meshes reach into the page's eye
-box (`EYE_BOX`, a copy of `EYE_BOUNDS` in `src/lib/cabin-scene.ts`; keep the two the same).
+box (`EYE_BOX`, a copy of `EYE_BOUNDS` in `src/lib/cabin-scene.ts`; keep the two the same), listing apart the seat-back
+parts, which the page hides while the eye is near them.
 
 ## 2. Bake on Kaggle
 
@@ -42,7 +44,8 @@ Pushes `cabin.py` to the private GPU kernel named in `bake_kaggle.py`, waits for
 downloads `cabin.glb`, `light_day.hdr`, `light_night.hdr`, the ten views as Cycles day renders (`day_home.png` and
 so on) and the run log into `out/`, and removes the denoised lightmaps of the bake before. Both lightmaps use the Cabin's second UV set; the **Cabin Screen** is a separate object
 named `Screen` and is not baked, and the side glass is a separate object named `Glass`, left out of the bake and exported
-with a see-through material.
+with a see-through material. Each seat's back, headrest and headrest posts are baked as part of the Cabin and then split
+off it into `SeatBackLeft` and `SeatBackRight`, which keep the Cabin's lightmap UVs and read the same lightmaps.
 
 ## 3. Denoise
 
@@ -75,5 +78,6 @@ python3 tools/cabin/verify.py
 ```
 
 Checks that every file in `public/cabin/` is the one the manifest names, that each name matches its content, that
-the GLB is Draco-compressed with a `Cabin` mesh carrying lightmap UVs and a separate `Screen` mesh, and that the two
+the GLB is Draco-compressed with a `Cabin` mesh and `SeatBackLeft` and `SeatBackRight` meshes carrying lightmap UVs
+and a separate `Screen` mesh, and that the two
 lightmaps are lossy WebP of the same size. Then commit `tools/cabin/` and `public/cabin/` together.

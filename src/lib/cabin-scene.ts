@@ -1,7 +1,8 @@
 // The Cabin as a three.js scene mounted into an element: the baked cabin drawn
 // over a placeholder street that drives past, in day or night lighting, the
-// orbit round a point above the Cabin Screen, the screen's drawing and its
-// presses, the zoom to the screen and back, and the resolution steps.
+// orbit round a point above the Cabin Screen, the seat backs hidden while the
+// eye is near them, the screen's drawing and its presses, the zoom to the
+// screen and back, and the resolution steps.
 // Browser-only; the home page loads it on demand.
 // See docs/adr/0011-home-is-a-cabin-over-a-reading-home.md and
 // docs/map/home-room.md.
@@ -13,7 +14,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { DRACOLoader, DRACO_GLTF_CONFIG } from 'three/addons/loaders/DRACOLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import manifest from '../../public/cabin/manifest.json';
-import { fitOrbit, fovFor, isTap, type Bounds, type Lighting, type PressPoint } from './cabin-rules';
+import { fitOrbit, fovFor, isNear, isTap, type Bounds, type Lighting, type PressPoint } from './cabin-rules';
 import {
   SCREEN_HEIGHT,
   SCREEN_WIDTH,
@@ -87,19 +88,26 @@ export type Cabin = {
 const ASSETS = '/cabin/';
 
 // The box the eye stays in, in the cabin's metres: between the door cards,
-// under the headliner, behind the dashboard and ahead of the seat backs.
+// under the headliner, behind the dashboard, above the seat cushions and
+// ahead of the partition behind the seats. It reaches into the seat backs.
 const EYE_BOUNDS: Bounds = {
   min: { x: -0.61, y: 0.82, z: -0.6 },
-  max: { x: 0.61, y: 1.26, z: -0.07 },
+  max: { x: 0.61, y: 1.26, z: 0.07 },
 };
+
+// The meshes holding each seat's back, headrest and headrest posts.
+const SEAT_BACKS = ['SeatBackLeft', 'SeatBackRight'];
+// A seat back is hidden while the eye is nearer than this to its bounding
+// box, in metres.
+const SEAT_BACK_NEAR = 0.12;
 
 // How far the orbit's centre, the point the view turns round and looks at
 // from the seat, stands above the Cabin Screen's centre, in metres.
 const ORBIT_LIFT = 0.21;
 
 // The seat view the Cabin opens on, as orbit angles in radians.
-const HOME_AZIMUTH = -0.4568;
-const HOME_POLAR = 1.4653;
+const HOME_AZIMUTH = -0.3881;
+const HOME_POLAR = 1.4802;
 
 const FOV = 60;
 // The least horizontal field of view, in degrees: a narrow (portrait) view
@@ -666,6 +674,11 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
       show.language = paint;
       if (!screen) throw new Error('The cabin has no mesh named Screen.');
       const screenMesh: THREE.Mesh = screen;
+      const seatBacks = SEAT_BACKS.map((name) => {
+        const part = cabin.getObjectByName(name);
+        if (!part) throw new Error(`The cabin has no mesh named ${name}.`);
+        return { part, box: new THREE.Box3().setFromObject(part) };
+      });
 
       const screenBox = new THREE.Box3().setFromObject(screenMesh);
       const screenCentre = screenBox.getCenter(new THREE.Vector3());
@@ -894,6 +907,7 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
         );
         view.position.add(sway);
         view.updateMatrixWorld();
+        for (const { part, box } of seatBacks) part.visible = !isNear(box, view.position, SEAT_BACK_NEAR);
         street.sky.position.copy(view.position);
 
         renderer.clear();

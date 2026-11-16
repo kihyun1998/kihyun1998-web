@@ -548,14 +548,18 @@ cylinder('cameraLens', 0.012, 0.006, (0, 0.676, 1.27), 'piano').rotation_euler =
 
 # ---------- seats: horizontally segmented cushions, a floating centre armrest, cup holders and window switches ----------
 SEAT_Z, SEAT_Y = 0.42, 0.45       # cushion top; how far the seats stand ahead of the script's seat coordinates
+# each seat's back blocks, headrest and headrest posts, by the name of the mesh they are exported as: baked with the
+# Cabin, then split off it
+SEAT_BACK_PARTS = {}
 def seat(x):
     for i, (y, d, h) in enumerate([(0.135, 0.17, 0.13), (-0.04, 0.17, 0.12), (-0.21, 0.165, 0.12)]):
         box(f'cush{x}{i}', (0.6, d, h), (x, SEAT_Y + y, SEAT_Z - h / 2), 'leather', 0.04, 2)
-    tilt = Matrix.Rotation(math.radians(-13), 4, 'X').to_quaternion()
+    tilt = Matrix.Rotation(math.radians(-13), 4, 'X').to_quaternion(); parts = []
     for i, (z, h) in enumerate([(SEAT_Z + 0.14, 0.24), (SEAT_Z + 0.385, 0.24), (SEAT_Z + 0.6, 0.18)]):
-        box(f'back{x}{i}', (0.6, 0.15, h - 0.006), (x, SEAT_Y - 0.39 - (z - SEAT_Z) * 0.23, z), 'leather', 0.045, 2, tilt)
-    box(f'head{x}', (0.29, 0.1, 0.19), (x, SEAT_Y - 0.59, SEAT_Z + 0.70), 'leather', 0.05, 2, tilt)
-    for dx in (-0.08, 0.08): cylinder(f'post{x}{dx}', 0.007, 0.07, (x + dx, SEAT_Y - 0.57, SEAT_Z + 0.665), 'midGrey', 10)
+        parts.append(box(f'back{x}{i}', (0.6, 0.15, h - 0.006), (x, SEAT_Y - 0.39 - (z - SEAT_Z) * 0.23, z), 'leather', 0.045, 2, tilt))
+    parts.append(box(f'head{x}', (0.29, 0.1, 0.19), (x, SEAT_Y - 0.59, SEAT_Z + 0.70), 'leather', 0.05, 2, tilt))
+    for dx in (-0.08, 0.08): parts.append(cylinder(f'post{x}{dx}', 0.007, 0.07, (x + dx, SEAT_Y - 0.57, SEAT_Z + 0.665), 'midGrey', 10))
+    SEAT_BACK_PARTS['SeatBackLeft' if x < 0 else 'SeatBackRight'] = parts
     box(f'base{x}', (0.5, 0.46, SEAT_Z - FLOOR - 0.12), (x, SEAT_Y - 0.08, (SEAT_Z - 0.12 + FLOOR) / 2), 'darkGrey', 0.02)
 seat(-0.375); seat(0.375)
 box('console', (0.15, 0.38, 0.1), (0, SEAT_Y, SEAT_Z - 0.08), 'darkGrey', 0.02, 1)
@@ -584,40 +588,52 @@ def camera(name, loc, target, fov, fit='AUTO'):
     c = bpy.data.objects.new(name, bpy.data.cameras.new(name)); sc.collection.objects.link(c)
     c.data.lens_unit = 'FOV'; c.data.sensor_fit = fit; c.data.angle = math.radians(fov); c.location = loc; c.data.clip_start = 0.02
     c.rotation_euler = (Vector(target) - Vector(loc)).to_track_quat('-Z', 'Y').to_euler(); return c
-# the page's opening view: orbit radius 0.855 m round a centre 0.21 m above the screen centre (ORBIT_LIFT) at azimuth
-# -0.4568, polar 1.4653, 60 deg tall
+# the page's opening view: orbit radius 0.995 m round a centre 0.21 m above the screen centre (ORBIT_LIFT) at azimuth
+# -0.3881, polar 1.4802, 60 deg tall
 ORBIT_C = (0, SCY, SCZ + 0.21)
-HOME = camera('home', (-0.375, 0.1819, 1.14), ORBIT_C, 60, 'VERTICAL')
+HOME = camera('home', (-0.375, 0.0278, 1.14), ORBIT_C, 60, 'VERTICAL')
 FRONT = camera('front', (0.0, -0.3, 1.15), (0.0, 1.2, 0.86), 76)
 DOOR = camera('door', (-1.15, -0.1, 1.08), (0.25, 0.95, 0.62), 70)
 CORNER = camera('corner', (-0.2, 0.2, 1.12), (0.62, 0.95, 1.30), 50)
 RDOOR = camera('rdoor', (-0.38, 0.25, 1.12), (0.78, 0.42, 0.72), 82)      # the right door seen from the left seat
 SIDE = camera('side', (-8.0, 0.55, 0.8), (0.0, 0.55, 0.8), 16)            # the right door from across the car, nearly flat
 DASHEND = camera('dashend', (-0.3, 0.45, 1.05), (-0.62, 1.05, 0.86), 50)
-# the orbit's azimuth limits, -0.7616 and 0.7616, at the opening view's polar angle
-LEFT = camera('left', (-0.5867, 0.3296, 1.14), ORBIT_C, 60, 'VERTICAL')
-RIGHT = camera('right', (0.5867, 0.3296, 1.14), ORBIT_C, 60, 'VERTICAL')
+# the orbit's azimuth limits, -0.6347 and 0.6347, at the opening view's polar angle
+LEFT = camera('left', (-0.5876, 0.1471, 1.14), ORBIT_C, 60, 'VERTICAL')
+RIGHT = camera('right', (0.5876, 0.1471, 1.14), ORBIT_C, 60, 'VERTICAL')
 OUTSIDE = camera('outside', (-3.0, 5.4, 1.7), (0.1, 1.5, 0.75), 34)      # the front three-quarter view of the maker's exterior image
 SHOTS = [(HOME, 1470, 729), (LEFT, 1470, 729), (RIGHT, 1470, 729), (FRONT, 1280, 960), (DOOR, 1280, 720), (CORNER, 1280, 960),
          (RDOOR, 1280, 720), (SIDE, 1600, 800), (DASHEND, 1280, 720), (OUTSIDE, 1280, 960)]
 LEFT_SIDE = ('door-1', 'release-1', 'glass-1', 'rail-1', 'bpillar-1')
 SEAT_BACKS = ('back-', 'back0', 'head-', 'head0', 'post', 'partition')   # left out of the front view
 SEATS = ('cush', 'back', 'head', 'post', 'base', 'console', 'armrest', 'armPost', 'cup', 'winSwitch')   # left out of the side view
+PAGE_VIEWS = (HOME, LEFT, RIGHT)
+SEAT_BACK_NEAR = 0.12  # the page's SEAT_BACK_NEAR: a seat back is hidden while the eye is nearer than this to its box
+
+def hidden_seat_backs(c):
+    """the parts of the seat backs the page hides with its eye at camera c"""
+    dg = bpy.context.evaluated_depsgraph_get(); hidden = set()
+    for parts in SEAT_BACK_PARTS.values():
+        P = [o.matrix_world @ v.co for o in parts for v in o.evaluated_get(dg).data.vertices]
+        gap = [max(min(p[i] for p in P) - c.location[i], 0, c.location[i] - max(p[i] for p in P)) for i in range(3)]
+        if math.hypot(*gap) < SEAT_BACK_NEAR: hidden |= {o.name for o in parts}
+    return hidden
 
 def shoot(prefix):
     for c, w, h in SHOTS:
+        near = hidden_seat_backs(c) if c in PAGE_VIEWS else set()
         # the photos are taken through the open left door: hide that door for the door view
         for o in bpy.data.objects:
             if o.name in LEFT_SIDE: o.hide_render = c in (DOOR, SIDE)
             if o.name.startswith(SEATS): o.hide_render = (c is SIDE)
-            if o.name.startswith(SEAT_BACKS): o.hide_render = c in (FRONT, SIDE)
+            if o.name.startswith(SEAT_BACKS): o.hide_render = c in (FRONT, SIDE) or o.name in near
             if o.name == 'body': o.hide_render = (c is SIDE)
         sc.camera = c; sc.render.resolution_x, sc.render.resolution_y = w, h
         sc.render.filepath = os.path.join(OUT, f'{prefix}_{c.name}.png')
         t = time.time(); bpy.ops.render.render(write_still=True); print(f'TIME {prefix}_{c.name}_s {time.time() - t:.2f}')
     for o in bpy.data.objects: o.hide_render = False
 
-EYE_BOX = ((-0.61, 0.07, 0.82), (0.61, 0.6, 1.26))   # the page's EYE_BOUNDS, in these axes
+EYE_BOX = ((-0.61, -0.07, 0.82), (0.61, 0.6, 1.26))   # the page's EYE_BOUNDS, in these axes
 def measure():
     """the proportions the map note compares with the maker's side view, and what stands inside the page's eye box,
     read from the built meshes"""
@@ -639,7 +655,8 @@ def measure():
     print('MEASURE faces', {n: len(bpy.data.objects[n].evaluated_get(dg).data.polygons) for n in ('door1', 'door-1')})
     lo, hi = EYE_BOX
     inside = {o.name for o in static + glass if any(all(lo[i] < p[i] < hi[i] for i in range(3)) for p in pts(o.name))}
-    print('MEASURE inside the eye box:', sorted(inside) or 'nothing')
+    backs = {o.name for parts in SEAT_BACK_PARTS.values() for o in parts}
+    print('MEASURE inside the eye box:', sorted(inside - backs) or 'nothing', '| seat backs, hidden near the eye:', sorted(inside & backs) or 'none')
 
 if MODE == 'wb':
     sc.render.engine = 'BLENDER_WORKBENCH'
@@ -677,7 +694,9 @@ shoot('day')
 # the side glass stays out of the bake
 for o in glass: o.hide_render = True
 
-# join the static cabin, lightmap UVs
+# join the static cabin, lightmap UVs; each seat back's vertices carry a vertex group of its mesh's name
+for name, parts in SEAT_BACK_PARTS.items():
+    for o in parts: o.vertex_groups.new(name=name).add(range(len(o.data.vertices)), 1.0, 'REPLACE')
 bpy.ops.object.select_all(action='DESELECT')
 for o in static: o.select_set(True)
 bpy.context.view_layer.objects.active = static[0]
@@ -712,11 +731,21 @@ lamp.rotation_euler = (Vector((0, SEAT_Y + 0.3, 0.8)) - lamp.location).to_track_
 bake('night')
 for k in ('strip', 'dome'): M[k].node_tree.nodes['Principled BSDF'].inputs['Emission Strength'].default_value = 0
 
+# each seat's back split off the baked Cabin: a mesh of its own with the Cabin's lightmap UVs
+seat_backs = []
+for name in SEAT_BACK_PARTS:
+    bpy.ops.object.select_all(action='DESELECT'); cabin.select_set(True); bpy.context.view_layer.objects.active = cabin
+    bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='DESELECT')
+    cabin.vertex_groups.active = cabin.vertex_groups[name]; bpy.ops.object.vertex_group_select()
+    bpy.ops.mesh.separate(type='SELECTED'); bpy.ops.object.mode_set(mode='OBJECT')
+    part = next(o for o in bpy.context.selected_objects if o is not cabin); part.name = part.data.name = name
+    seat_backs.append(part)
+for o in (cabin, *seat_backs): o.vertex_groups.clear()
 bpy.ops.object.select_all(action='DESELECT')
 for o in glass: o.hide_render = False; o.select_set(True)
 bpy.context.view_layer.objects.active = glass[0]
 bpy.ops.object.join(); side_glass = bpy.context.object; side_glass.name = 'Glass'
 bpy.ops.object.select_all(action='DESELECT')
-for o in (cabin, scr, side_glass): o.select_set(True)
+for o in (cabin, scr, side_glass, *seat_backs): o.select_set(True)
 bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, 'cabin.glb'), use_selection=True, export_format='GLB', export_yup=True, export_texcoords=True, export_apply=True)
-print('DONE', len(cabin.data.polygons), 'faces')
+print('DONE', len(cabin.data.polygons), 'faces;', ', '.join(f'{o.name} {len(o.data.polygons)}' for o in seat_backs))
