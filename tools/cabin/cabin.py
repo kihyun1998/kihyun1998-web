@@ -30,8 +30,8 @@ def mat(name, hexc, rough=0.6, metal=0.0, emit=None, alpha=1.0):
     m.diffuse_color = (*lin(hexc), alpha)   # Workbench uses this
     return m
 M = {
-    'lightGrey': mat('lightGrey', '#959595', 0.65), 'headliner': mat('headliner', '#bcbcbc', 0.95),
-    'dash': mat('dash', '#595959', 0.6), 'dashBand': mat('dashBand', '#787878', 0.6), 'darkGrey': mat('darkGrey', '#4a4a4a', 0.55), 'midGrey': mat('midGrey', '#6c6c6c', 0.45),
+    'lightGrey': mat('lightGrey', '#7a7a7a', 0.65), 'headliner': mat('headliner', '#bcbcbc', 0.95),
+    'dash': mat('dash', '#484848', 0.6), 'dashBand': mat('dashBand', '#787878', 0.6), 'darkGrey': mat('darkGrey', '#4a4a4a', 0.55), 'midGrey': mat('midGrey', '#6c6c6c', 0.45),
     'leather': mat('leather', '#434343', 0.42), 'carpet': mat('carpet', '#565656', 1.0),
     'piano': mat('piano', '#111111', 0.15, 0.3), 'strip': mat('strip', '#d9d2c6', 0.4, emit='#ffd9a8'),
     'dome': mat('dome', '#e8e6e1', 0.5, emit='#fff1dc'), 'red': mat('red', '#7d1d1d', 0.4),
@@ -710,6 +710,7 @@ bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.004); bpy
 
 def bake(tag):
     img = bpy.data.images.new(f'light_{tag}', SIZE, SIZE, float_buffer=True)
+    img.colorspace_settings.name = 'Non-Color'   # the HDR holds the baked light as is, linear
     for m in cabin.data.materials:
         n = m.node_tree.nodes.new('ShaderNodeTexImage'); n.image = img; m.node_tree.nodes.active = n
         u = m.node_tree.nodes.new('ShaderNodeUVMap'); u.uv_map = 'Lightmap'; m.node_tree.links.new(u.outputs['UV'], n.inputs['Vector'])

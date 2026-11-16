@@ -14,7 +14,16 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { DRACOLoader, DRACO_GLTF_CONFIG } from 'three/addons/loaders/DRACOLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import manifest from '../../public/cabin/manifest.json';
-import { fitOrbit, fovFor, isNear, isTap, type Bounds, type Lighting, type PressPoint } from './cabin-rules';
+import {
+  fitOrbit,
+  fovFor,
+  isNear,
+  isTap,
+  lightmapColorSpace,
+  type Bounds,
+  type Lighting,
+  type PressPoint,
+} from './cabin-rules';
 import {
   SCREEN_HEIGHT,
   SCREEN_WIDTH,
@@ -124,7 +133,7 @@ const ZOOM_MS = 900;
 // strip and the dome lights; the rest is the street's sky, fog and lights.
 const LOOKS = {
   day: {
-    light: 2.7,
+    light: 9,
     reflection: 0.4,
     strip: 0,
     dome: 0,
@@ -141,7 +150,7 @@ const LOOKS = {
     lamps: 0,
   },
   night: {
-    light: 2.4,
+    light: 9,
     reflection: 0.15,
     strip: 1.6,
     dome: 0.6,
@@ -406,15 +415,24 @@ function buildStreet(): Street {
   return { scene, sky, advance, setLighting };
 }
 
-// The line in three.js's lightmap and environment chunk that adds the
-// environment's diffuse light, and the chunk without it.
+// The lines in three.js's lightmap and environment chunk that add the
+// environment's diffuse light and that turn the lightmap's texel into light.
 const ENVIRONMENT_DIFFUSE = 'iblIrradiance += getIBLIrradiance( geometryNormal );';
-const REFLECTION_ONLY_CHUNK = THREE.ShaderChunk.lights_fragment_maps.replace(ENVIRONMENT_DIFFUSE, '');
+const LIGHTMAP_LIGHT = 'vec3 lightMapIrradiance = lightMapTexel.rgb * lightMapIntensity;';
+// The chunk without the environment's diffuse light, and with the lightmap's
+// texel decoded from sRGB twice more (the `srgb-thrice` encoding, whose third
+// curve the texture's own sRGB decoding undoes).
+const CABIN_LIGHT_CHUNK = THREE.ShaderChunk.lights_fragment_maps
+  .replace(ENVIRONMENT_DIFFUSE, '')
+  .replace(
+    LIGHTMAP_LIGHT,
+    'vec3 lightMapIrradiance = sRGBTransferEOTF( sRGBTransferEOTF( lightMapTexel ) ).rgb * lightMapIntensity;',
+  );
 
-// Makes a material take its diffuse light from the lightmap alone: the
-// environment map then adds reflections and no diffuse light.
-function reflectionOnly(shader: { fragmentShader: string }) {
-  shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_maps>', REFLECTION_ONLY_CHUNK);
+// Makes a material take its diffuse light from the lightmap alone, decoded to
+// linear light: the environment map then adds reflections and no diffuse light.
+function cabinLight(shader: { fragmentShader: string }) {
+  shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_maps>', CABIN_LIGHT_CHUNK);
 }
 
 // Frees every geometry, material and texture under `root`.
@@ -475,6 +493,9 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
   function start() {
     if (!THREE.ShaderChunk.lights_fragment_maps.includes(ENVIRONMENT_DIFFUSE)) {
       throw new Error('three.js no longer has the environment diffuse line the Cabin removes.');
+    }
+    if (!THREE.ShaderChunk.lights_fragment_maps.includes(LIGHTMAP_LIGHT)) {
+      throw new Error('three.js no longer has the lightmap line the Cabin decodes.');
     }
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     const canvas = renderer.domElement;
@@ -537,7 +558,7 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
           (light) => {
             light.flipY = false;
             light.channel = 1;
-            light.colorSpace = THREE.SRGBColorSpace;
+            light.colorSpace = lightmapColorSpace(manifest.lightmaps[which].encoding);
             if (disposed) light.dispose();
             else cleanups.push(() => light.dispose());
             return light;
@@ -630,8 +651,8 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
         if (mesh.name === 'Glass') return;
         for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
           const standard = material as THREE.MeshStandardMaterial;
-          standard.onBeforeCompile = reflectionOnly;
-          standard.customProgramCacheKey = () => 'reflection-only';
+          standard.onBeforeCompile = cabinLight;
+          standard.customProgramCacheKey = () => 'cabin-light';
           lit.push(standard);
           if (standard.name === 'strip') {
             standard.emissive.set(STRIP_GLOW);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import manifest from '../../public/cabin/manifest.json';
 import {
   ORBIT_MARGIN,
   fitOrbit,
@@ -6,6 +7,7 @@ import {
   homeFor,
   isNear,
   isTap,
+  lightmapColorSpace,
   type Bounds,
   type Point,
   type Press,
@@ -364,5 +366,23 @@ describe('fovFor', () => {
   it('keeps the vertical field where it already sees exactly the least field across', () => {
     const aspect = Math.tan((20 * Math.PI) / 180) / Math.tan((30 * Math.PI) / 180);
     expect(fovFor(aspect, 60, 40)).toBeCloseTo(60, 9);
+  });
+});
+
+describe('lightmapColorSpace', () => {
+  it('uploads a lightmap stored with the sRGB curve applied three times as an sRGB texture', () => {
+    expect(lightmapColorSpace('srgb-thrice')).toBe('srgb');
+  });
+
+  it('refuses an encoding it does not know, or none', () => {
+    expect(() => lightmapColorSpace('srgb-twice')).toThrow(/"srgb-twice"/);
+    expect(() => lightmapColorSpace('srgb')).toThrow(/"srgb"/);
+    expect(() => lightmapColorSpace(undefined)).toThrow(/undefined/);
+  });
+
+  it('knows the encoding of every lightmap in the committed manifest', () => {
+    const entries = Object.values(manifest.lightmaps) as { encoding?: string }[];
+    expect(entries).toHaveLength(2);
+    for (const entry of entries) expect(lightmapColorSpace(entry.encoding)).toBe('srgb');
   });
 });
