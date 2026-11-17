@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AVIF_KEY,
+  AVIF_PROBE,
   CHOICE_KEY,
   COVER_ATTRIBUTE,
   COVER_GAVE_UP_EVENT,
   COVER_LIMIT_MS,
   FRAME_TEST_KEY,
+  avifFor,
   coverScript,
   coverState,
   liftCover,
@@ -67,6 +70,18 @@ type Page = {
   now?: number;
 };
 
+// A stand-in for the probe's <img>: records the source it was given; `answer`
+// fires onload or onerror.
+class ProbeImage {
+  src = '';
+  onload: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  answer(decodes: boolean) {
+    if (decodes) this.onload?.();
+    else this.onerror?.();
+  }
+}
+
 // Runs the head script against the given page and returns <html>, the clock,
 // a way to change the page's visibility, and the events it dispatched.
 function run({
@@ -82,6 +97,12 @@ function run({
   const dispatched: string[] = [];
   const listeners = new Set<() => void>();
   const contexts = { made: 0 };
+  const images: ProbeImage[] = [];
+  const Image = function () {
+    const image = new ProbeImage();
+    images.push(image);
+    return image;
+  };
   const localStorage = {
     getItem(key: string) {
       if (storage === 'throws') throw new Error('SecurityError');
@@ -119,6 +140,7 @@ function run({
     'performance',
     'setTimeout',
     'clearTimeout',
+    'Image',
     coverScript,
   )(
     window,
@@ -128,12 +150,13 @@ function run({
     { now: () => clock.now },
     clock.setTimeout,
     clock.clearTimeout,
+    Image,
   );
   const setHidden = (value: boolean) => {
     document.hidden = value;
     for (const listener of [...listeners]) listener();
   };
-  return { root, clock, setHidden, dispatched, listeners, contexts };
+  return { root, clock, setHidden, dispatched, listeners, contexts, images };
 }
 
 const covered = (page: Page) => run(page).root.getAttribute(COVER_ATTRIBUTE) === 'cover';
@@ -173,31 +196,84 @@ describe('coverScript', () => {
     expect(covered({ path: '/open-source' })).toBe(false);
   });
 
-  it('covers exactly when homeFor gives the Cabin, for every stored state', () => {
+  it('covers exactly when homeFor gives the Cabin, for every stored state and probe answer', () => {
     const choices = [null, 'cabin', 'reading-home', 'something-else'];
     const frameTests = [null, 'failed', 'passed'];
+    const avifs = [null, 'unsupported', 'something-else'];
+    // The probe's answer: not yet, decodes, does not decode.
+    const answers = [null, true, false];
     let cabins = 0;
+    let runs = 0;
     for (const webgl of [true, false])
       for (const reducedMotion of [true, false])
         for (const choice of choices)
-          for (const frameTest of frameTests) {
-            const storage: Record<string, string> = {};
-            if (choice !== null) storage[CHOICE_KEY] = choice;
-            if (frameTest !== null) storage[FRAME_TEST_KEY] = frameTest;
-            const home = homeFor({
-              webgl,
-              reducedMotion,
-              frameTestFailed: frameTest === 'failed',
-              choice: choice === 'cabin' || choice === 'reading-home' ? (choice as StoredHome) : null,
-            });
-            if (home === 'cabin') cabins++;
-            expect(covered({ webgl, reducedMotion, storage }), JSON.stringify({ webgl, reducedMotion, storage })).toBe(
-              home === 'cabin',
-            );
-          }
+          for (const frameTest of frameTests)
+            for (const avif of avifs)
+              for (const answer of answers) {
+                const storage: Record<string, string> = {};
+                if (choice !== null) storage[CHOICE_KEY] = choice;
+                if (frameTest !== null) storage[FRAME_TEST_KEY] = frameTest;
+                if (avif !== null) storage[AVIF_KEY] = avif;
+                const home = homeFor({
+                  webgl,
+                  avif: avifFor(avif, answer) !== false,
+                  reducedMotion,
+                  frameTestFailed: frameTest === 'failed',
+                  choice: choice === 'cabin' || choice === 'reading-home' ? (choice as StoredHome) : null,
+                });
+                runs++;
+                if (home === 'cabin') cabins++;
+                const page = run({ webgl, reducedMotion, storage });
+                if (answer !== null) for (const image of page.images) image.answer(answer);
+                expect(
+                  page.root.getAttribute(COVER_ATTRIBUTE) === 'cover',
+                  JSON.stringify({ webgl, reducedMotion, storage, answer }),
+                ).toBe(home === 'cabin');
+              }
     // The window is not vacuous: both outcomes occur.
     expect(cabins).toBeGreaterThan(0);
-    expect(cabins).toBeLessThan(2 * 2 * choices.length * frameTests.length);
+    expect(cabins).toBeLessThan(runs);
+  });
+
+  it('covers at once while the AVIF probe has not answered, and probes the probe image once', () => {
+    const { root, images } = run({});
+    expect(root.getAttribute(COVER_ATTRIBUTE)).toBe('cover');
+    expect(images.map((image) => image.src)).toEqual([AVIF_PROBE]);
+  });
+
+  it('lifts the cover when the AVIF probe fails, and keeps it when the probe decodes', () => {
+    const failed = run({});
+    failed.images[0].answer(false);
+    expect(failed.root.getAttribute(COVER_ATTRIBUTE)).toBe(null);
+    expect(failed.dispatched).toEqual([]);
+    failed.clock.advance(COVER_LIMIT_MS);
+    expect(failed.root.getAttribute(COVER_ATTRIBUTE)).toBe(null);
+    expect(failed.dispatched).toEqual([]);
+
+    const decoded = run({});
+    decoded.images[0].answer(true);
+    expect(decoded.root.getAttribute(COVER_ATTRIBUTE)).toBe('cover');
+  });
+
+  it('keeps a give-up when the AVIF probe fails after it', () => {
+    const { root, clock, images } = run({});
+    clock.advance(COVER_LIMIT_MS);
+    images[0].answer(false);
+    expect(root.getAttribute(COVER_ATTRIBUTE)).toBe('gave-up');
+  });
+
+  it('leaves the page uncovered, creates no WebGL context and probes nothing when AVIF is stored as unsupported', () => {
+    const page = run({ storage: { [AVIF_KEY]: 'unsupported' } });
+    expect(page.root.getAttribute(COVER_ATTRIBUTE)).toBe(null);
+    expect(page.contexts.made).toBe(0);
+    expect(page.images).toEqual([]);
+    expect(page.clock.pending).toBe(0);
+  });
+
+  it('probes nothing when it does not cover', () => {
+    expect(run({ webgl: false }).images).toEqual([]);
+    expect(run({ reducedMotion: true }).images).toEqual([]);
+    expect(run({ path: '/projects' }).images).toEqual([]);
   });
 
   it('gives up at the limit, counted from the start of the page load', () => {
@@ -255,6 +331,24 @@ describe('coverScript', () => {
     const { clock, listeners } = run({ webgl: false });
     expect(clock.pending).toBe(0);
     expect(listeners.size).toBe(0);
+  });
+});
+
+describe('avifFor', () => {
+  // stored, answer → decodes on this load
+  const cases = [
+    [null, null, null],
+    [null, true, true],
+    [null, false, false],
+    ['unsupported', null, false],
+    ['unsupported', true, false],
+    ['unsupported', false, false],
+    ['something-else', null, null],
+    ['something-else', true, true],
+    ['something-else', false, false],
+  ] as const;
+  it.each(cases)('stored %s, probe answer %s → %s', (stored, answer, decodes) => {
+    expect(avifFor(stored, answer)).toBe(decodes);
   });
 });
 

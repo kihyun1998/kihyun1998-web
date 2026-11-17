@@ -17,11 +17,15 @@ import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, BookOpen, Car } from 'lucide-react';
 import {
+  AVIF_KEY,
+  AVIF_PROBE,
   CHOICE_KEY,
   COVER_GAVE_UP_EVENT,
   FRAME_TEST_KEY,
+  avifFor,
   coverState,
   liftCover,
+  probeAvif,
 } from '@/lib/cabin-cover';
 import { homeFor, type Home, type Lighting, type StoredHome } from '@/lib/cabin-rules';
 import type { Cabin as CabinScene } from '@/lib/cabin-scene';
@@ -57,11 +61,29 @@ const write = (key: string, value: string | null) => {
   homeStore.notify();
 };
 
-// Whether this browser can run the Cabin: it has WebGL 2, and on this page
-// load the Cabin has not failed to start.
+// Whether this browser decodes AVIF on this page load, by `avifFor` from the
+// probe result stored when the load began and this load's probe answer. The
+// probe runs either way and stores its answer for the next load.
+let probing = false;
+let storedAvif: string | null = null;
+let probeAnswer: boolean | null = null;
+const decodesAvif = () => {
+  if (!probing) {
+    probing = true;
+    storedAvif = read(AVIF_KEY);
+    probeAvif(new Image(), AVIF_PROBE, (decodes) => {
+      probeAnswer = decodes;
+      write(AVIF_KEY, decodes ? null : 'unsupported');
+    });
+  }
+  return avifFor(storedAvif, probeAnswer);
+};
+
+// Whether this browser has WebGL 2 and, on this page load, the Cabin has not
+// failed to start.
 let webgl: boolean | null = null;
 let broken = false;
-const canRun = () => {
+const startable = () => {
   if (webgl === null) {
     try {
       webgl = document.createElement('canvas').getContext('webgl2') !== null;
@@ -71,6 +93,10 @@ const canRun = () => {
   }
   return webgl && !broken;
 };
+
+// Whether this browser can run the Cabin: it is startable and decodes AVIF.
+// Null while the AVIF probe has not answered.
+const canRun = (): boolean | null => (startable() ? decodesAvif() : false);
 
 // The Cabin was not ready within the cover's limit on this page load: the
 // Reading Home, with the switch, until the visitor presses it. `lateSeen`
@@ -99,15 +125,17 @@ const storedChoice = (): StoredHome => {
   return stored === 'cabin' || stored === 'reading-home' ? stored : null;
 };
 
-const homeNow = (): Home =>
-  late
-    ? 'reading-home'
-    : homeFor({
-        webgl: canRun(),
-        frameTestFailed: read(FRAME_TEST_KEY) === 'failed',
-        reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-        choice: storedChoice(),
-      });
+const homeNow = (): Home | null => {
+  if (late) return 'reading-home';
+  if (canRun() === null) return null;
+  return homeFor({
+    webgl: startable(),
+    avif: decodesAvif() !== false,
+    frameTestFailed: read(FRAME_TEST_KEY) === 'failed',
+    reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    choice: storedChoice(),
+  });
+};
 
 // The server cannot know any of it, so it reports nothing and renders nothing.
 const unknownOnServer = () => null;
