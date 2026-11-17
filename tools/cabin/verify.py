@@ -69,6 +69,7 @@ for tag, entry in manifest['lightmaps'].items():
     name = entry['file']; listed.add(name)
     data = versioned(name, f'light-{tag}', 'webp')
     check(isinstance(entry.get('scale'), (int, float)) and entry['scale'] > 0, f'manifest: lightmap {tag} has no positive scale')
+    check(entry.get('encoding') == 'srgb-thrice', f'manifest: lightmap {tag} has encoding {entry.get("encoding")!r}, expected srgb-thrice')
     if data is None: continue
     check(len(data) <= MAX_LIGHTMAP_BYTES, f'{name}: {len(data)} bytes, over {MAX_LIGHTMAP_BYTES}')
     sizes[tag] = webp_size(data, name)

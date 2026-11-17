@@ -1,7 +1,8 @@
 // The Cabin's rules as plain functions of their inputs: what counts as a tap
 // on the Cabin Screen, the orbit that keeps the eye inside the cabin, whether
-// the eye is near a box, the field of view of a narrow view, which lighting a
-// theme means, and whether a visitor gets the Cabin or the Reading Home.
+// the eye is near a box, the field of view of a narrow view, the colour space
+// a lightmap's encoding is uploaded in, which lighting a theme means, and
+// whether a visitor gets the Cabin or the Reading Home.
 // Nothing here touches the DOM or three.js.
 // See docs/adr/0011-home-is-a-cabin-over-a-reading-home.md and
 // docs/map/home-room.md.
@@ -139,4 +140,14 @@ export function fovFor(aspect: number, fov: number, minAcross: number): number {
   const half = (degrees: number) => Math.tan((degrees * Math.PI) / 360);
   const needed = (2 * Math.atan(half(minAcross) / aspect) * 180) / Math.PI;
   return Math.max(fov, needed);
+}
+
+// The colour space the page uploads a lightmap's texture in, for a lightmap
+// stored in `encoding`, as the manifest names it. `srgb-thrice` is light
+// divided by its scale with the sRGB curve applied three times, in 8 bits: the
+// texture's sRGB decoding undoes one, the Cabin's lightmap shader line the
+// other two. Any other encoding, or none, throws.
+export function lightmapColorSpace(encoding: string | undefined): 'srgb' {
+  if (encoding === 'srgb-thrice') return 'srgb';
+  throw new Error(`The Cabin does not know the lightmap encoding ${JSON.stringify(encoding)}.`);
 }

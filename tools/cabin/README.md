@@ -42,7 +42,8 @@ python3 tools/cabin/bake_kaggle.py 1024 64    # a quick look
 
 Pushes `cabin.py` to the private GPU kernel named in `bake_kaggle.py`, waits for the run (about four minutes), and
 downloads `cabin.glb`, `light_day.hdr`, `light_night.hdr`, the ten views as Cycles day renders (`day_home.png` and
-so on) and the run log into `out/`, and removes the denoised lightmaps of the bake before. Both lightmaps use the Cabin's second UV set; the **Cabin Screen** is a separate object
+so on) and the run log into `out/`, and removes the denoised lightmaps of the bake before. Each HDR holds the baked
+light as Cycles computed it, linear, with no colour curve. Both lightmaps use the Cabin's second UV set; the **Cabin Screen** is a separate object
 named `Screen` and is not baked, and the side glass is a separate object named `Glass`, left out of the bake and exported
 with a see-through material. Each seat's back, headrest and headrest posts are baked as part of the Cabin and then split
 off it into `SeatBackLeft` and `SeatBackRight`, which keep the Cabin's lightmap UVs and read the same lightmaps.
@@ -64,9 +65,11 @@ $BLENDER -b --factory-startup --python tools/cabin/compress.py
 Replaces the files in `public/cabin/`:
 
 - `cabin.<hash>.glb`: the scene with Draco mesh compression. The page needs three.js's `DRACOLoader`.
-- `light-day.<hash>.webp`, `light-night.<hash>.webp`: each lightmap as 8-bit sRGB-encoded `light / scale`. The page
-  loads it as an sRGB texture with `flipY = false` on UV channel 1 and multiplies the lightmap intensity by `scale`.
-- `manifest.json`: the current file names and each lightmap's `scale`.
+- `light-day.<hash>.webp`, `light-night.<hash>.webp`: each lightmap's linear light divided by `scale`, with the sRGB
+  curve applied three times, in 8 bits (the manifest's `encoding`, `srgb-thrice`). The page loads it as an sRGB texture
+  with `flipY = false` on UV channel 1, decodes the sampled value from sRGB twice more in the shader, and multiplies
+  the lightmap intensity by `scale`. Why three times: `docs/map/home-room.md`, "The lightmaps hold linear light".
+- `manifest.json`: the current file names and each lightmap's `scale` and `encoding`.
 
 `<hash>` is the first 8 hex digits of the file's SHA-256, so a changed asset always has a new URL. The page reads the
 names from the manifest and never hard-codes them.
@@ -80,4 +83,4 @@ python3 tools/cabin/verify.py
 Checks that every file in `public/cabin/` is the one the manifest names, that each name matches its content, that
 the GLB is Draco-compressed with a `Cabin` mesh and `SeatBackLeft` and `SeatBackRight` meshes carrying lightmap UVs
 and a separate `Screen` mesh, and that the two
-lightmaps are lossy WebP of the same size. Then commit `tools/cabin/` and `public/cabin/` together.
+lightmaps are lossy WebP of the same size, with `srgb-thrice` named as each one's encoding in the manifest. Then commit `tools/cabin/` and `public/cabin/` together.

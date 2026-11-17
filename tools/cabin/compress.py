@@ -3,8 +3,8 @@
 # Reads cabin.glb, light_day_dn.hdr and light_night_dn.hdr from $CABIN_OUT (or out/ beside this file) and writes
 # into public/cabin/:
 #   cabin.<hash>.glb          the same scene with Draco mesh compression
-#   light-<tag>.<hash>.webp   the lightmap as 8-bit sRGB-encoded (light / scale)
-#   manifest.json             the current file names and each lightmap's scale
+#   light-<tag>.<hash>.webp   the lightmap's linear light / scale, the sRGB curve applied three times, in 8 bits
+#   manifest.json             the current file names and each lightmap's scale and encoding (srgb-thrice)
 # <hash> is the first 8 hex digits of the file's SHA-256. Files of an earlier version are removed.
 import bpy, sys, os, json, hashlib, glob
 import numpy as np
@@ -31,10 +31,10 @@ def lightmap(tag):
     px = np.empty(w * h * 4, dtype=np.float32); src.pixels.foreach_get(px); rgb = px.reshape(h, w, 4)[:, :, :3]
     scale = float(np.ceil(rgb.max() * 4) / 4)   # the brightest texel maps to at most 1
     out = bpy.data.images.new(f'light-{tag}', w, h, alpha=False); out.colorspace_settings.name = 'Non-Color'
-    buf = np.ones((h, w, 4), dtype=np.float32); buf[:, :, :3] = np.clip(srgb(rgb / scale), 0, 1)
+    buf = np.ones((h, w, 4), dtype=np.float32); buf[:, :, :3] = np.clip(srgb(srgb(srgb(rgb / scale))), 0, 1)
     out.pixels.foreach_set(buf.ravel())
     tmp = os.path.join(DST, f'.light-{tag}.webp'); out.filepath_raw = tmp; out.file_format = 'WEBP'; out.save(quality=QUALITY)
-    return {'file': publish(tmp, f'light-{tag}', 'webp'), 'scale': scale}
+    return {'file': publish(tmp, f'light-{tag}', 'webp'), 'scale': scale, 'encoding': 'srgb-thrice'}
 
 def geometry():
     bpy.ops.wm.read_factory_settings(use_empty=True)
