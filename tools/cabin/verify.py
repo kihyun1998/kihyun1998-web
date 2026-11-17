@@ -27,11 +27,12 @@ def versioned(name, stem, ext):
     check(name == f'{stem}.{digest}.{ext}', f'{name}: name does not carry its content hash (expected {stem}.{digest}.{ext})')
     return data
 
-def webp_size(data, name):
-    """(width, height) of a lossy WebP, read from its VP8 frame header"""
-    if not check(data[:4] == b'RIFF' and data[8:12] == b'WEBP', f'{name}: not a WebP file'): return None
-    if not check(data[12:16] == b'VP8 ' and data[23:26] == b'\x9d\x01\x2a', f'{name}: not a lossy (VP8) WebP'): return None
-    w, h = struct.unpack('<HH', data[26:30]); return w & 0x3fff, h & 0x3fff
+def avif_size(data, name):
+    """(width, height) of an AVIF image, read from its first image spatial extents (ispe) box"""
+    if not check(data[4:8] == b'ftyp' and data[8:12] == b'avif', f'{name}: not an AVIF file'): return None
+    at = data.find(b'ispe')
+    if not check(at > 0 and len(data) >= at + 16, f'{name}: no image size (ispe) box'): return None
+    return struct.unpack('>II', data[at + 8:at + 16])
 
 def glb_json(data, name):
     if not check(data[:4] == b'glTF', f'{name}: not a GLB file'): return None
@@ -67,12 +68,12 @@ sizes = {}
 check(set(manifest['lightmaps']) == {'day', 'night'}, f'manifest: lightmaps are {sorted(manifest["lightmaps"])}, expected day and night')
 for tag, entry in manifest['lightmaps'].items():
     name = entry['file']; listed.add(name)
-    data = versioned(name, f'light-{tag}', 'webp')
+    data = versioned(name, f'light-{tag}', 'avif')
     check(isinstance(entry.get('scale'), (int, float)) and entry['scale'] > 0, f'manifest: lightmap {tag} has no positive scale')
     check(entry.get('encoding') == 'srgb-thrice', f'manifest: lightmap {tag} has encoding {entry.get("encoding")!r}, expected srgb-thrice')
     if data is None: continue
     check(len(data) <= MAX_LIGHTMAP_BYTES, f'{name}: {len(data)} bytes, over {MAX_LIGHTMAP_BYTES}')
-    sizes[tag] = webp_size(data, name)
+    sizes[tag] = avif_size(data, name)
 if len(sizes) == 2 and all(sizes.values()):
     check(sizes['day'] == sizes['night'], f'lightmaps differ in size: day {sizes["day"]}, night {sizes["night"]}')
 

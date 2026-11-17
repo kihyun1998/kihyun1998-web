@@ -33,14 +33,28 @@ triangulation left out (0 is right), and which meshes reach into the page's eye
 box (`EYE_BOX`, a copy of `EYE_BOUNDS` in `src/lib/cabin-scene.ts`; keep the two the same), listing apart the seat-back
 parts, which the page hides while the eye is near them.
 
-## 2. Bake on Kaggle
+## 2. Look at how the lightmap is shared out
+
+```sh
+$BLENDER -b --factory-startup --python tools/cabin/cabin.py -- uv
+```
+
+Joins the Cabin and lays out its lightmap UVs as the bake does, without Cycles (about two minutes), and prints `MEASURE`
+lines: how much of the map is covered, how much of the Cabin's area the page's eye never sees and what share of the map
+that takes, and for each part its area, the share of it that is seen, the nearest eye that sees it, its share of the
+map and its texel size. What the eye can see comes from the orbit the page fits in `EYE_BOX` round `ORBIT_C` with `ORBIT_MARGIN`, the zoom
+to the screen (`ZOOM_D`), the opening view's angles in `page_eyes` and `SEAT_BACK_NEAR`, all copies of the page's; keep
+them the same. Why the map is shared this
+way: `docs/map/home-room.md`, "The lightmap goes to what the seat sees".
+
+## 3. Bake on Kaggle
 
 ```sh
 python3 tools/cabin/bake_kaggle.py            # 2048 px, 256 samples
 python3 tools/cabin/bake_kaggle.py 1024 64    # a quick look
 ```
 
-Pushes `cabin.py` to the private GPU kernel named in `bake_kaggle.py`, waits for the run (about four minutes), and
+Pushes `cabin.py` to the private GPU kernel named in `bake_kaggle.py`, waits for the run, and
 downloads `cabin.glb`, `light_day.hdr`, `light_night.hdr`, the ten views as Cycles day renders (`day_home.png` and
 so on) and the run log into `out/`, and removes the denoised lightmaps of the bake before. Each HDR holds the baked
 light as Cycles computed it, linear, with no colour curve. Both lightmaps use the Cabin's second UV set; the **Cabin Screen** is a separate object
@@ -48,7 +62,7 @@ named `Screen` and is not baked, and the side glass is a separate object named `
 with a see-through material. Each seat's back, headrest and headrest posts are baked as part of the Cabin and then split
 off it into `SeatBackLeft` and `SeatBackRight`, which keep the Cabin's lightmap UVs and read the same lightmaps.
 
-## 3. Denoise
+## 4. Denoise
 
 ```sh
 $BLENDER -b --factory-startup --python tools/cabin/denoise.py
@@ -56,7 +70,7 @@ $BLENDER -b --factory-startup --python tools/cabin/denoise.py
 
 Writes `out/light_day_dn.hdr` and `out/light_night_dn.hdr`.
 
-## 4. Compress
+## 5. Compress
 
 ```sh
 $BLENDER -b --factory-startup --python tools/cabin/compress.py
@@ -65,16 +79,16 @@ $BLENDER -b --factory-startup --python tools/cabin/compress.py
 Replaces the files in `public/cabin/`:
 
 - `cabin.<hash>.glb`: the scene with Draco mesh compression. The page needs three.js's `DRACOLoader`.
-- `light-day.<hash>.webp`, `light-night.<hash>.webp`: each lightmap's linear light divided by `scale`, with the sRGB
-  curve applied three times, in 8 bits (the manifest's `encoding`, `srgb-thrice`). The page loads it as an sRGB texture
+- `light-day.<hash>.avif`, `light-night.<hash>.avif`: each lightmap's linear light divided by `scale`, with the sRGB
+  curve applied three times, in 8 bits (the manifest's `encoding`, `srgb-thrice`), as AVIF at quality 90. The page loads it as an sRGB texture
   with `flipY = false` on UV channel 1, decodes the sampled value from sRGB twice more in the shader, and multiplies
-  the lightmap intensity by `scale`. Why three times: `docs/map/home-room.md`, "The lightmaps hold linear light".
+  the lightmap intensity by `scale`. Why three times: `docs/map/home-room.md`, "The lightmaps hold linear light"; why AVIF: "The lightmap goes to what the seat sees".
 - `manifest.json`: the current file names and each lightmap's `scale` and `encoding`.
 
 `<hash>` is the first 8 hex digits of the file's SHA-256, so a changed asset always has a new URL. The page reads the
 names from the manifest and never hard-codes them.
 
-## 5. Check and commit
+## 6. Check and commit
 
 ```sh
 python3 tools/cabin/verify.py
@@ -83,4 +97,4 @@ python3 tools/cabin/verify.py
 Checks that every file in `public/cabin/` is the one the manifest names, that each name matches its content, that
 the GLB is Draco-compressed with a `Cabin` mesh and `SeatBackLeft` and `SeatBackRight` meshes carrying lightmap UVs
 and a separate `Screen` mesh, and that the two
-lightmaps are lossy WebP of the same size, with `srgb-thrice` named as each one's encoding in the manifest. Then commit `tools/cabin/` and `public/cabin/` together.
+lightmaps are AVIF of the same size, with `srgb-thrice` named as each one's encoding in the manifest. Then commit `tools/cabin/` and `public/cabin/` together.
