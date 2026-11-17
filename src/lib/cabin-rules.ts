@@ -38,6 +38,9 @@ export type StoredHome = Home | null;
 export type Visitor = {
   // WebGL is available in this browser.
   webgl: boolean;
+  // This browser decodes AVIF, the format of the Cabin's lightmaps and
+  // surface textures.
+  avif: boolean;
   // The Cabin ran over its frame budget in its first seconds.
   frameTestFailed: boolean;
   // The visitor's device asks for reduced motion.
@@ -45,11 +48,11 @@ export type Visitor = {
   choice: StoredHome;
 };
 
-// The Reading Home when the Cabin cannot run or ran too slowly. Otherwise the
-// stored choice; with none stored, the Cabin unless reduced motion is asked
-// for.
+// The Reading Home when the Cabin cannot run (no WebGL, no AVIF) or ran too
+// slowly. Otherwise the stored choice; with none stored, the Cabin unless
+// reduced motion is asked for.
 export function homeFor(visitor: Visitor): Home {
-  if (!visitor.webgl || visitor.frameTestFailed) return 'reading-home';
+  if (!visitor.webgl || !visitor.avif || visitor.frameTestFailed) return 'reading-home';
   if (visitor.choice !== null) return visitor.choice;
   return visitor.reducedMotion ? 'reading-home' : 'cabin';
 }

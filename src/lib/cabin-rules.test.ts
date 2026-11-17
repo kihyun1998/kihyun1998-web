@@ -77,41 +77,66 @@ describe('isTap', () => {
 });
 
 describe('homeFor', () => {
-  // Every combination of the four inputs, written out: without WebGL or after
-  // a failed frame test it is the Reading Home whatever was chosen; otherwise
-  // the stored choice decides, and with none stored, reduced motion does.
-  // webgl, frameTestFailed, reducedMotion, choice → home
+  // Every combination of the five inputs, written out: without WebGL, without
+  // AVIF or after a failed frame test it is the Reading Home whatever was
+  // chosen; otherwise the stored choice decides, and with none stored, reduced
+  // motion does.
+  // webgl, avif, frameTestFailed, reducedMotion, choice → home
   const cases = [
-    [true, false, false, null, 'cabin'],
-    [true, false, false, 'cabin', 'cabin'],
-    [true, false, false, 'reading-home', 'reading-home'],
-    [true, false, true, null, 'reading-home'],
-    [true, false, true, 'cabin', 'cabin'],
-    [true, false, true, 'reading-home', 'reading-home'],
-    [true, true, false, null, 'reading-home'],
-    [true, true, false, 'cabin', 'reading-home'],
-    [true, true, false, 'reading-home', 'reading-home'],
-    [true, true, true, null, 'reading-home'],
-    [true, true, true, 'cabin', 'reading-home'],
-    [true, true, true, 'reading-home', 'reading-home'],
-    [false, false, false, null, 'reading-home'],
-    [false, false, false, 'cabin', 'reading-home'],
-    [false, false, false, 'reading-home', 'reading-home'],
-    [false, false, true, null, 'reading-home'],
-    [false, false, true, 'cabin', 'reading-home'],
-    [false, false, true, 'reading-home', 'reading-home'],
-    [false, true, false, null, 'reading-home'],
-    [false, true, false, 'cabin', 'reading-home'],
-    [false, true, false, 'reading-home', 'reading-home'],
-    [false, true, true, null, 'reading-home'],
-    [false, true, true, 'cabin', 'reading-home'],
-    [false, true, true, 'reading-home', 'reading-home'],
+    [true, true, false, false, null, 'cabin'],
+    [true, true, false, false, 'cabin', 'cabin'],
+    [true, true, false, false, 'reading-home', 'reading-home'],
+    [true, true, false, true, null, 'reading-home'],
+    [true, true, false, true, 'cabin', 'cabin'],
+    [true, true, false, true, 'reading-home', 'reading-home'],
+    [true, true, true, false, null, 'reading-home'],
+    [true, true, true, false, 'cabin', 'reading-home'],
+    [true, true, true, false, 'reading-home', 'reading-home'],
+    [true, true, true, true, null, 'reading-home'],
+    [true, true, true, true, 'cabin', 'reading-home'],
+    [true, true, true, true, 'reading-home', 'reading-home'],
+    [true, false, false, false, null, 'reading-home'],
+    [true, false, false, false, 'cabin', 'reading-home'],
+    [true, false, false, false, 'reading-home', 'reading-home'],
+    [true, false, false, true, null, 'reading-home'],
+    [true, false, false, true, 'cabin', 'reading-home'],
+    [true, false, false, true, 'reading-home', 'reading-home'],
+    [true, false, true, false, null, 'reading-home'],
+    [true, false, true, false, 'cabin', 'reading-home'],
+    [true, false, true, false, 'reading-home', 'reading-home'],
+    [true, false, true, true, null, 'reading-home'],
+    [true, false, true, true, 'cabin', 'reading-home'],
+    [true, false, true, true, 'reading-home', 'reading-home'],
+    [false, true, false, false, null, 'reading-home'],
+    [false, true, false, false, 'cabin', 'reading-home'],
+    [false, true, false, false, 'reading-home', 'reading-home'],
+    [false, true, false, true, null, 'reading-home'],
+    [false, true, false, true, 'cabin', 'reading-home'],
+    [false, true, false, true, 'reading-home', 'reading-home'],
+    [false, true, true, false, null, 'reading-home'],
+    [false, true, true, false, 'cabin', 'reading-home'],
+    [false, true, true, false, 'reading-home', 'reading-home'],
+    [false, true, true, true, null, 'reading-home'],
+    [false, true, true, true, 'cabin', 'reading-home'],
+    [false, true, true, true, 'reading-home', 'reading-home'],
+    [false, false, false, false, null, 'reading-home'],
+    [false, false, false, false, 'cabin', 'reading-home'],
+    [false, false, false, false, 'reading-home', 'reading-home'],
+    [false, false, false, true, null, 'reading-home'],
+    [false, false, false, true, 'cabin', 'reading-home'],
+    [false, false, false, true, 'reading-home', 'reading-home'],
+    [false, false, true, false, null, 'reading-home'],
+    [false, false, true, false, 'cabin', 'reading-home'],
+    [false, false, true, false, 'reading-home', 'reading-home'],
+    [false, false, true, true, null, 'reading-home'],
+    [false, false, true, true, 'cabin', 'reading-home'],
+    [false, false, true, true, 'reading-home', 'reading-home'],
   ] as const;
 
   it.each(cases)(
-    'webgl %s, frame test failed %s, reduced motion %s, stored choice %s → %s',
-    (webgl, frameTestFailed, reducedMotion, choice, home) => {
-      expect(homeFor({ webgl, frameTestFailed, reducedMotion, choice })).toBe(home);
+    'webgl %s, avif %s, frame test failed %s, reduced motion %s, stored choice %s → %s',
+    (webgl, avif, frameTestFailed, reducedMotion, choice, home) => {
+      expect(homeFor({ webgl, avif, frameTestFailed, reducedMotion, choice })).toBe(home);
     },
   );
 });
