@@ -1,5 +1,6 @@
-// The Cabin as a three.js scene mounted into an element: the baked cabin drawn
-// over a placeholder street that drives past, in day or night lighting, the
+// The Cabin as a three.js scene mounted into an element: the baked cabin, its
+// materials' surface tiles projected on them, drawn over a placeholder street
+// that drives past, in day or night lighting, the
 // orbit round a point above the Cabin Screen, the seat backs hidden while the
 // eye is near them, the screen's drawing and its presses, the zoom to the
 // screen and back, and the resolution steps.
@@ -20,7 +21,9 @@ import {
   isNear,
   isTap,
   lightmapColorSpace,
+  surfaceTexture,
   type Bounds,
+  type SurfaceTextureEntry,
   type Lighting,
   type PressPoint,
 } from './cabin-rules';
@@ -435,6 +438,37 @@ function cabinLight(shader: { fragmentShader: string }) {
   shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_maps>', CABIN_LIGHT_CHUNK);
 }
 
+// The lines in three.js's standard material shaders that apply the colour map
+// and that set the vertex's position.
+const MAP_LINE = '#include <map_fragment>';
+const BEGIN_VERTEX_LINE = '#include <begin_vertex>';
+type ShaderParts = { vertexShader: string; fragmentShader: string; uniforms: Record<string, { value: unknown }> };
+const PROJECTED_VARYINGS = 'varying vec3 vProjectedPosition;\nvarying vec3 vProjectedNormal;';
+
+// Makes a material draw its colour map projected along the three world axes,
+// `repeat` tiles to a metre, each projection weighed by how squarely the
+// surface faces its axis.
+function projectedMap(shader: ShaderParts, repeat: number) {
+  shader.uniforms.projectedRepeat = { value: repeat };
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', `#include <common>\n${PROJECTED_VARYINGS}`)
+    .replace(
+      BEGIN_VERTEX_LINE,
+      `${BEGIN_VERTEX_LINE}\nvProjectedPosition = (modelMatrix * vec4(position, 1.0)).xyz;\nvProjectedNormal = mat3(modelMatrix) * normal;`,
+    );
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', `#include <common>\n${PROJECTED_VARYINGS}\nuniform float projectedRepeat;`)
+    .replace(
+      MAP_LINE,
+      `vec3 projectedWeight = pow(abs(normalize(vProjectedNormal)), vec3(4.0));
+      projectedWeight /= dot(projectedWeight, vec3(1.0));
+      vec3 projectedAt = vProjectedPosition * projectedRepeat;
+      diffuseColor *= texture2D(map, projectedAt.zy) * projectedWeight.x
+        + texture2D(map, projectedAt.xz) * projectedWeight.y
+        + texture2D(map, projectedAt.xy) * projectedWeight.z;`,
+    );
+}
+
 // Frees every geometry, material and texture under `root`.
 function disposeTree(root: THREE.Object3D) {
   root.traverse((object) => {
@@ -496,6 +530,12 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
     }
     if (!THREE.ShaderChunk.lights_fragment_maps.includes(LIGHTMAP_LIGHT)) {
       throw new Error('three.js no longer has the lightmap line the Cabin decodes.');
+    }
+    if (!THREE.ShaderLib.standard.fragmentShader.includes(MAP_LINE)) {
+      throw new Error('three.js no longer has the colour map line the Cabin projects.');
+    }
+    if (!THREE.ShaderLib.standard.vertexShader.includes(BEGIN_VERTEX_LINE)) {
+      throw new Error('three.js no longer has the vertex line the Cabin projects from.');
     }
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     const canvas = renderer.domElement;
@@ -664,6 +704,50 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
         }
       });
       cabinScene.add(cabin);
+
+      // Each material the manifest gives a surface texture, drawn with it
+      // once its tile has loaded; the Cabin does not wait for the tiles.
+      const tiles = new Map<string, Promise<THREE.Texture>>();
+      const tile = (file: string) => {
+        let loaded = tiles.get(file);
+        if (!loaded) {
+          loaded = new THREE.TextureLoader().loadAsync(ASSETS + file).then((texture) => {
+            texture.colorSpace = THREE.SRGBColorSpace;
+            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+            texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            if (disposed) texture.dispose();
+            else cleanups.push(() => texture.dispose());
+            return texture;
+          });
+          tiles.set(file, loaded);
+        }
+        return loaded;
+      };
+      const textures: Record<string, SurfaceTextureEntry & { file: string }> = manifest.textures;
+      for (const [name, kind] of Object.entries(manifest.surfaces as Record<string, string>)) {
+        const entry = textures[kind];
+        const materials = new Set(lit.filter((material) => material.name === name));
+        if (!entry || materials.size === 0) {
+          console.error(`The Cabin cannot give ${name} the surface texture ${kind}.`);
+          continue;
+        }
+        const { repeat, colorGain } = surfaceTexture(entry);
+        tile(entry.file)
+          .then((map) => {
+            if (disposed) return;
+            for (const material of materials) {
+              material.map = map;
+              material.color.multiplyScalar(colorGain);
+              material.onBeforeCompile = (shader) => {
+                cabinLight(shader);
+                projectedMap(shader, repeat);
+              };
+              material.customProgramCacheKey = () => 'cabin-light-projected';
+              material.needsUpdate = true;
+            }
+          })
+          .catch((error) => console.error(`The Cabin could not load the surface texture ${kind}.`, error));
+      }
 
       // Puts the street, the reflection of it, the cabin's light and the
       // Cabin Screen in `which` lighting, lit by `light`.

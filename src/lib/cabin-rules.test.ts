@@ -8,6 +8,7 @@ import {
   isNear,
   isTap,
   lightmapColorSpace,
+  surfaceTexture,
   type Bounds,
   type Point,
   type Press,
@@ -384,5 +385,26 @@ describe('lightmapColorSpace', () => {
     const entries = Object.values(manifest.lightmaps) as { encoding?: string }[];
     expect(entries).toHaveLength(2);
     for (const entry of entries) expect(lightmapColorSpace(entry.encoding)).toBe('srgb');
+  });
+});
+
+describe('surfaceTexture', () => {
+  it('repeats a tile once per its size in metres and lifts the base colour by the tile mean', () => {
+    expect(surfaceTexture({ tile: 0.25, mean: 0.8 })).toEqual({ repeat: 4, colorGain: 1.25 });
+    expect(surfaceTexture({ tile: 0.2, mean: 0.5 })).toEqual({ repeat: 5, colorGain: 2 });
+  });
+
+  it('accepts every surface texture in the committed manifest, and each surface names one of them', () => {
+    const textures = manifest.textures as Record<string, { tile: number; mean: number }>;
+    expect(Object.keys(textures).length).toBeGreaterThan(0);
+    for (const entry of Object.values(textures)) expect(surfaceTexture(entry).repeat).toBeGreaterThan(0);
+    for (const kind of Object.values(manifest.surfaces as Record<string, string>)) expect(textures).toHaveProperty(kind);
+  });
+
+  it('refuses a tile with no positive size, or a mean outside (0, 1]', () => {
+    expect(() => surfaceTexture({ tile: 0, mean: 0.8 })).toThrow(/tile/);
+    expect(() => surfaceTexture({ tile: -1, mean: 0.8 })).toThrow(/tile/);
+    expect(() => surfaceTexture({ tile: 0.25, mean: 0 })).toThrow(/mean/);
+    expect(() => surfaceTexture({ tile: 0.25, mean: 1.2 })).toThrow(/mean/);
   });
 });

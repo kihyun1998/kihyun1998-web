@@ -151,3 +151,17 @@ export function lightmapColorSpace(encoding: string | undefined): 'srgb' {
   if (encoding === 'srgb-thrice') return 'srgb';
   throw new Error(`The Cabin does not know the lightmap encoding ${JSON.stringify(encoding)}.`);
 }
+
+// A material's surface texture as the manifest lists it: the tile's size in
+// metres and the linear mean of its colour image.
+export type SurfaceTextureEntry = { tile: number; mean: number };
+
+// How the page draws a surface texture: `repeat` tiles to a metre of world
+// space, and `colorGain`, what the base colour is multiplied by, the inverse
+// of the colour image's mean. A tile with no positive size, or a mean outside
+// (0, 1], throws.
+export function surfaceTexture({ tile, mean }: SurfaceTextureEntry): { repeat: number; colorGain: number } {
+  if (!(tile > 0)) throw new RangeError(`A Cabin surface texture's tile must be positive, not ${tile}.`);
+  if (!(mean > 0 && mean <= 1)) throw new RangeError(`A Cabin surface texture's mean must be in (0, 1], not ${mean}.`);
+  return { repeat: 1 / tile, colorGain: 1 / mean };
+}

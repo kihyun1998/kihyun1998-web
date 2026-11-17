@@ -11,5 +11,39 @@
       "scale": 13.0,
       "encoding": "srgb-thrice"
     }
+  },
+  "textures": {
+    "leather": {
+      "file": "tex-leather.6451fbff.avif",
+      "tile": 0.25,
+      "mean": 0.8003
+    },
+    "felt": {
+      "file": "tex-felt.978c5004.avif",
+      "tile": 0.2,
+      "mean": 0.8004
+    },
+    "stipple": {
+      "file": "tex-stipple.d1e38b59.avif",
+      "tile": 0.15,
+      "mean": 0.8004
+    },
+    "carpet": {
+      "file": "tex-carpet.d42fb47c.avif",
+      "tile": 0.1,
+      "mean": 0.799
+    }
+  },
+  "surfaces": {
+    "leather": "leather",
+    "insert": "felt",
+    "headliner": "felt",
+    "carpet": "carpet",
+    "dash": "stipple",
+    "dashBand": "stipple",
+    "darkGrey": "stipple",
+    "midGrey": "stipple",
+    "lightGrey": "stipple",
+    "frame": "stipple"
   }
 }
