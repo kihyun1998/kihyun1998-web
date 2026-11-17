@@ -11,6 +11,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DIR = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, '..', '..', 'public', 'cabin')
 MAX_LIGHTMAP_BYTES = 1_000_000
 MAX_GEOMETRY_BYTES = 1_000_000
+MAX_TEXTURE_BYTES = 200_000
 failures = []
 
 def check(ok, message):
@@ -63,6 +64,22 @@ if geo is not None:
             check(nodes['Screen']['mesh'] != nodes.get('Cabin', {}).get('mesh'), f'{geo_name}: Screen shares the Cabin mesh')
             check(all('TEXCOORD_0' in p['attributes'] and 'TEXCOORD_1' not in p['attributes'] for p in prims(nodes['Screen'])),
                   f'{geo_name}: Screen must carry its own UVs and no lightmap UVs')
+
+materials = {m.get('name') for m in gltf.get('materials', [])} if geo is not None and gltf is not None else None
+textures = manifest.get('textures', {}); surfaces = manifest.get('surfaces', {})
+check(bool(textures) and bool(surfaces), 'manifest: no surface textures or no surfaces')
+for kind, entry in textures.items():
+    name = entry.get('file', ''); listed.add(name)
+    data = versioned(name, f'tex-{kind}', 'avif')
+    check(isinstance(entry.get('tile'), (int, float)) and entry['tile'] > 0, f'manifest: texture {kind} has no positive tile')
+    check(isinstance(entry.get('mean'), (int, float)) and 0 < entry['mean'] <= 1, f'manifest: texture {kind} has no mean in (0, 1]')
+    check(kind in surfaces.values(), f'manifest: texture {kind} is used by no surface')
+    if data is None: continue
+    check(len(data) <= MAX_TEXTURE_BYTES, f'{name}: {len(data)} bytes, over {MAX_TEXTURE_BYTES}')
+    avif_size(data, name)
+for material, kind in surfaces.items():
+    check(kind in textures, f'manifest: surface {material} names the texture {kind}, which the manifest does not list')
+    if materials is not None: check(material in materials, f'manifest: surface {material} is no material of {geo_name}')
 
 sizes = {}
 check(set(manifest['lightmaps']) == {'day', 'night'}, f'manifest: lightmaps are {sorted(manifest["lightmaps"])}, expected day and night')

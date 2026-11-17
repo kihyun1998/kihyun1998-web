@@ -1,10 +1,13 @@
 # Compress the baked Cabin into the files the site serves. Run in headless Blender:
-#   blender -b --factory-startup --python compress.py [-- <AVIF quality, default 90>]
-# Reads cabin.glb, light_day_dn.hdr and light_night_dn.hdr from $CABIN_OUT (or out/ beside this file) and writes
-# into public/cabin/:
+#   blender -b --factory-startup --python compress.py [-- <lightmap AVIF quality, default 90> [<texture AVIF quality, default 80>]]
+# Reads cabin.glb, light_day_dn.hdr and light_night_dn.hdr from $CABIN_OUT (or out/ beside this file), and the surface
+# textures textures.py wrote there, and writes into public/cabin/:
 #   cabin.<hash>.glb          the same scene with Draco mesh compression
 #   light-<tag>.<hash>.avif   the lightmap's linear light / scale, the sRGB curve applied three times, in 8 bits
-#   manifest.json             the current file names and each lightmap's scale and encoding (srgb-thrice)
+#   tex-<kind>.<hash>.avif    each kind of surface texture's grey tile, sRGB
+#   manifest.json             the current file names, each lightmap's scale and encoding (srgb-thrice), each
+#                             surface texture's tile size in metres and its file's linear mean, and the kind each
+#                             material uses (surfaces)
 # <hash> is the first 8 hex digits of the file's SHA-256. Files of an earlier version are removed.
 import bpy, sys, os, json, hashlib, glob
 import numpy as np
@@ -14,6 +17,7 @@ SRC = os.environ.get('CABIN_OUT') or os.path.join(HERE, 'out')
 DST = os.path.join(HERE, '..', '..', 'public', 'cabin')
 args = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 QUALITY = int(args[0]) if args else 90
+TEXTURE_QUALITY = int(args[1]) if len(args) > 1 else 80
 os.makedirs(DST, exist_ok=True)
 
 def publish(tmp, stem, ext):
@@ -36,6 +40,17 @@ def lightmap(tag):
     tmp = os.path.join(DST, f'.light-{tag}.avif'); out.filepath_raw = tmp; out.file_format = 'AVIF'; out.save(quality=QUALITY)
     return {'file': publish(tmp, f'light-{tag}', 'avif'), 'scale': scale, 'encoding': 'srgb-thrice'}
 
+def linear(x): return np.where(x <= 0.04045, x / 12.92, np.power((x + 0.055) / 1.055, 2.4))
+
+def texture(kind, tile):
+    src = bpy.data.images.load(os.path.join(SRC, f'tex_{kind}.png')); src.colorspace_settings.name = 'Non-Color'
+    src.pixels.foreach_get(np.empty(len(src.pixels), dtype=np.float32))     # reads the file in
+    tmp = os.path.join(DST, f'.tex-{kind}.avif'); src.filepath_raw = tmp; src.file_format = 'AVIF'; src.save(quality=TEXTURE_QUALITY)
+    name = publish(tmp, f'tex-{kind}', 'avif')
+    stored = bpy.data.images.load(os.path.join(DST, name)); stored.colorspace_settings.name = 'Non-Color'
+    px = np.empty(len(stored.pixels), dtype=np.float32); stored.pixels.foreach_get(px)
+    return {'file': name, 'tile': tile, 'mean': round(float(linear(px.reshape(-1, 4)[:, :3]).mean()), 4)}
+
 def geometry():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=os.path.join(SRC, 'cabin.glb'))
@@ -48,6 +63,9 @@ def geometry():
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 manifest = {'lightmaps': {tag: lightmap(tag) for tag in ('day', 'night')}}
+with open(os.path.join(SRC, 'textures.json')) as f: textures = json.load(f)
+manifest['textures'] = {kind: texture(kind, tile) for kind, tile in textures['kinds'].items()}
+manifest['surfaces'] = textures['materials']
 manifest = {'geometry': geometry(), **manifest}
 with open(os.path.join(DST, 'manifest.json'), 'w') as f: json.dump(manifest, f, indent=2); f.write('\n')
 print('DONE', json.dumps(manifest))

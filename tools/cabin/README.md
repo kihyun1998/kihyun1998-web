@@ -70,7 +70,18 @@ $BLENDER -b --factory-startup --python tools/cabin/denoise.py
 
 Writes `out/light_day_dn.hdr` and `out/light_night_dn.hdr`.
 
-## 5. Compress
+## 5. Make the surface textures
+
+```sh
+$BLENDER -b --factory-startup --python tools/cabin/textures.py
+```
+
+Writes `out/tex_<kind>.png`, one seamless grey tile for each kind of surface (leather, felt, stipple, carpet), made
+from seeded noise, and `out/textures.json`: each kind's tile size in metres and which kind each Cabin material is drawn
+with. No image from elsewhere goes in. A few seconds; the tiles do not depend on the bake. Why they are made this way:
+`docs/map/home-room.md`, "The materials' surface textures".
+
+## 6. Compress
 
 ```sh
 $BLENDER -b --factory-startup --python tools/cabin/compress.py
@@ -83,12 +94,16 @@ Replaces the files in `public/cabin/`:
   curve applied three times, in 8 bits (the manifest's `encoding`, `srgb-thrice`), as AVIF at quality 90. The page loads it as an sRGB texture
   with `flipY = false` on UV channel 1, decodes the sampled value from sRGB twice more in the shader, and multiplies
   the lightmap intensity by `scale`. Why three times: `docs/map/home-room.md`, "The lightmaps hold linear light"; why AVIF: "The lightmap goes to what the seat sees".
-- `manifest.json`: the current file names and each lightmap's `scale` and `encoding`.
+- `tex-<kind>.<hash>.avif`: each surface tile, as AVIF at quality 80. The page loads it as an sRGB texture and draws it
+  projected along the three world axes, `1 / tile` tiles to a metre (the GLB has no texture UVs), on the materials
+  `surfaces` names, their base colour divided by the tile's `mean`.
+- `manifest.json`: the current file names, each lightmap's `scale` and `encoding`, each surface tile's `tile` (metres)
+  and `mean` (the stored file's linear mean), and `surfaces`, the tile each material is drawn with.
 
 `<hash>` is the first 8 hex digits of the file's SHA-256, so a changed asset always has a new URL. The page reads the
 names from the manifest and never hard-codes them.
 
-## 6. Check and commit
+## 7. Check and commit
 
 ```sh
 python3 tools/cabin/verify.py
@@ -96,5 +111,7 @@ python3 tools/cabin/verify.py
 
 Checks that every file in `public/cabin/` is the one the manifest names, that each name matches its content, that
 the GLB is Draco-compressed with a `Cabin` mesh and `SeatBackLeft` and `SeatBackRight` meshes carrying lightmap UVs
-and a separate `Screen` mesh, and that the two
-lightmaps are AVIF of the same size, with `srgb-thrice` named as each one's encoding in the manifest. Then commit `tools/cabin/` and `public/cabin/` together.
+and a separate `Screen` mesh, that the two
+lightmaps are AVIF of the same size, with `srgb-thrice` named as each one's encoding in the manifest, and that each surface
+tile is AVIF with a positive tile size and a mean in (0, 1], is used by some surface, and that every surface is a
+material of the GLB and names a listed tile. Then commit `tools/cabin/` and `public/cabin/` together.
