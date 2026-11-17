@@ -1,9 +1,9 @@
 # Compress the baked Cabin into the files the site serves. Run in headless Blender:
-#   blender -b --factory-startup --python compress.py [-- <webp quality, default 90>]
+#   blender -b --factory-startup --python compress.py [-- <AVIF quality, default 90>]
 # Reads cabin.glb, light_day_dn.hdr and light_night_dn.hdr from $CABIN_OUT (or out/ beside this file) and writes
 # into public/cabin/:
 #   cabin.<hash>.glb          the same scene with Draco mesh compression
-#   light-<tag>.<hash>.webp   the lightmap's linear light / scale, the sRGB curve applied three times, in 8 bits
+#   light-<tag>.<hash>.avif   the lightmap's linear light / scale, the sRGB curve applied three times, in 8 bits
 #   manifest.json             the current file names and each lightmap's scale and encoding (srgb-thrice)
 # <hash> is the first 8 hex digits of the file's SHA-256. Files of an earlier version are removed.
 import bpy, sys, os, json, hashlib, glob
@@ -19,7 +19,7 @@ os.makedirs(DST, exist_ok=True)
 def publish(tmp, stem, ext):
     """move tmp to <stem>.<hash>.<ext> in DST, dropping that asset's earlier versions; returns the file name"""
     digest = hashlib.sha256(open(tmp, 'rb').read()).hexdigest()[:8]
-    for old in glob.glob(os.path.join(DST, f'{stem}.*.{ext}')): os.remove(old)
+    for old in glob.glob(os.path.join(DST, f'{stem}.*')): os.remove(old)
     name = f'{stem}.{digest}.{ext}'; os.replace(tmp, os.path.join(DST, name))
     print(f'WROTE {name} {os.path.getsize(os.path.join(DST, name))} bytes')
     return name
@@ -33,8 +33,8 @@ def lightmap(tag):
     out = bpy.data.images.new(f'light-{tag}', w, h, alpha=False); out.colorspace_settings.name = 'Non-Color'
     buf = np.ones((h, w, 4), dtype=np.float32); buf[:, :, :3] = np.clip(srgb(srgb(srgb(rgb / scale))), 0, 1)
     out.pixels.foreach_set(buf.ravel())
-    tmp = os.path.join(DST, f'.light-{tag}.webp'); out.filepath_raw = tmp; out.file_format = 'WEBP'; out.save(quality=QUALITY)
-    return {'file': publish(tmp, f'light-{tag}', 'webp'), 'scale': scale, 'encoding': 'srgb-thrice'}
+    tmp = os.path.join(DST, f'.light-{tag}.avif'); out.filepath_raw = tmp; out.file_format = 'AVIF'; out.save(quality=QUALITY)
+    return {'file': publish(tmp, f'light-{tag}', 'avif'), 'scale': scale, 'encoding': 'srgb-thrice'}
 
 def geometry():
     bpy.ops.wm.read_factory_settings(use_empty=True)

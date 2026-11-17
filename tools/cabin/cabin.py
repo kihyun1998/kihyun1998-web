@@ -1,5 +1,6 @@
 # The Cabin: geometry, Workbench previews, day and night lightmap bakes, GLB export. Run in headless Blender:
 #   blender -b --factory-startup --python cabin.py -- wb                          ten Workbench previews (no Cycles), MEASURE lines
+#   blender -b --factory-startup --python cabin.py -- uv [size]                    the lightmap's UVs laid out (no Cycles), MEASURE lines
 #   blender -b --factory-startup --python cabin.py -- bake [size] [samples]       Cycles: ten day renders, day + night
 #                                                                                 diffuse lightmaps, cabin.glb
 # Output goes to $CABIN_OUT, or to out/ beside this file.
@@ -13,7 +14,7 @@ args = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 MODE = args[0] if args else 'wb'
 SIZE = int(args[1]) if len(args) > 1 else 2048
 SAMPLES = int(args[2]) if len(args) > 2 else 256
-if MODE not in ('wb', 'bake'): sys.exit(f'unknown mode {MODE!r}: use wb or bake')
+if MODE not in ('wb', 'uv', 'bake'): sys.exit(f'unknown mode {MODE!r}: use wb, uv or bake')
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 sc = bpy.context.scene
@@ -658,6 +659,177 @@ def measure():
     backs = {o.name for parts in SEAT_BACK_PARTS.values() for o in parts}
     print('MEASURE inside the eye box:', sorted(inside - backs) or 'nothing', '| seat backs, hidden near the eye:', sorted(inside & backs) or 'none')
 
+# ---------- the lightmap's UVs: the joined Cabin unwrapped, each island sized by how near the page's eye sees it ----------
+ORBIT_MARGIN = 0.02                                   # the page's ORBIT_MARGIN
+ORBIT_R = ORBIT_C[1] - EYE_BOX[0][1] - ORBIT_MARGIN   # the page's fitOrbit round ORBIT_C in EYE_BOX: radius, polar and azimuth limits
+POLAR = [math.acos((EYE_BOX[i][2] - m - ORBIT_C[2]) / ORBIT_R) for i, m in ((1, ORBIT_MARGIN), (0, -ORBIT_MARGIN))]
+AZIMUTH = math.asin((EYE_BOX[1][0] - ORBIT_MARGIN) / ORBIT_R)
+ZOOM_D = SH / (2 * math.tan(math.radians(30)) * 0.62)   # the page's zoomed eye, in front of the screen centre
+VIEW_TAN = (math.tan(math.radians(64)), math.tan(math.radians(45)))   # half the widest view counted: 32:9 across, 90 deg tall (a view 0.36 wide for its height)
+PACK_MARGIN = 0.004                 # round each island, as a fraction of the map: 8 texels at 2048 px, the bake's margin
+UNSEEN, NEAR, FAR = 0.125, 0.3, 0.9   # an unseen piece's scale; a seen piece's is sqrt(FAR / its distance), the distance held between NEAR and FAR
+UNSEEN_MARGIN = 0.0005              # round each unseen piece, as a fraction of their block
+KEEP = 0.03                         # an unseen face this near a seen one of its island is sized with it
+def page_eyes(n_az=29, n_polar=15):
+    """(eye, what it looks at) over the page's orbit, and along the zoom to the screen from its corners and the opening view"""
+    out = []; centre = Vector(ORBIT_C); screen = Vector((0, SCY, SCZ)); near = Vector((0, SCY - ZOOM_D, SCZ))
+    def eye(az, polar): return centre + ORBIT_R * Vector((math.sin(polar) * math.sin(az), -math.sin(polar) * math.cos(az), math.cos(polar)))
+    for i in range(n_az):
+        for j in range(n_polar):
+            out.append((eye(AZIMUTH * (2 * i / (n_az - 1) - 1), POLAR[0] + (POLAR[1] - POLAR[0]) * j / (n_polar - 1)), centre))
+    for az, polar in ((-AZIMUTH, POLAR[0]), (AZIMUTH, POLAR[0]), (-AZIMUTH, POLAR[1]), (AZIMUTH, POLAR[1]), (-0.3881, 1.4802)):
+        for z in (0.25, 0.5, 0.75, 1.0): out.append((eye(az, polar).lerp(near, z), centre.lerp(screen, z)))
+    return out
+def seen_from_page(cabin, nx=360, ny=176):
+    """for each face of the joined Cabin, the distance from the nearest of the page's eyes that sees it, or None: rays
+    over each eye's view, the Cabin Screen in the way, the side glass not, a seat back not while the page hides it"""
+    from mathutils.bvhtree import BVHTree
+    me = cabin.data; W = cabin.matrix_world; co = [W @ v.co for v in me.vertices]; polys = [tuple(p.vertices) for p in me.polygons]
+    back_of = {}                                        # face -> the seat back it belongs to
+    for name in SEAT_BACK_PARTS:
+        g = cabin.vertex_groups[name].index; inside = {v.index for v in me.vertices if any(e.group == g for e in v.groups)}
+        back_of.update({i: name for i, p in enumerate(polys) if all(v in inside for v in p)})
+    boxes = {}
+    for name in SEAT_BACK_PARTS:
+        P = [co[v] for i, n in back_of.items() if n == name for v in polys[i]]
+        boxes[name] = [(min(p[k] for p in P), max(p[k] for p in P)) for k in range(3)]
+    sv = [scr.matrix_world @ v.co for v in scr.data.vertices]; n0 = len(co)
+    trees = {}
+    def tree(hidden):
+        if hidden not in trees:
+            keep = [i for i in range(len(polys)) if back_of.get(i) not in hidden]
+            trees[hidden] = (BVHTree.FromPolygons(co + sv, [polys[i] for i in keep] + [tuple(range(n0, n0 + len(sv)))]), keep)
+        return trees[hidden]
+    dist = [None] * len(polys); centre = [W @ p.center for p in me.polygons]; missed = None
+    for eye, target in page_eyes():
+        hidden = frozenset(n for n, b in boxes.items() if math.hypot(*(max(lo - eye[k], 0, eye[k] - hi) for k, (lo, hi) in enumerate(b))) < SEAT_BACK_NEAR)
+        bvh, keep = tree(hidden)
+        f = (target - eye).normalized(); r = f.cross(Vector((0, 0, 1))).normalized(); u = r.cross(f)
+        for a in range(nx):
+            ta = VIEW_TAN[0] * (2 * (a + 0.5) / nx - 1)
+            for b in range(ny):
+                _, _, i, d = bvh.ray_cast(eye, f + r * ta + u * (VIEW_TAN[1] * (2 * (b + 0.5) / ny - 1)))
+                if i is not None and i < len(keep) and (dist[keep[i]] is None or d < dist[keep[i]]): dist[keep[i]] = d
+        # faces too small for that grid: a ray at the middle of each face the first eye's rays missed (of every face,
+        # from the first eye)
+        slot = {i: k for k, i in enumerate(keep)}
+        for i in range(len(polys)) if missed is None else missed:
+            if i not in slot: continue
+            v = centre[i] - eye; along = v.dot(f)
+            if along <= 0 or abs(v.dot(r)) > VIEW_TAN[0] * along or abs(v.dot(u)) > VIEW_TAN[1] * along: continue
+            _, _, j, d = bvh.ray_cast(eye, v)
+            if j == slot[i] and (dist[i] is None or d < dist[i]): dist[i] = d
+        if missed is None: missed = [i for i in range(len(polys)) if dist[i] is None]
+    return dist
+PART_NAMES = []
+def unwrap():
+    """the static parts joined into the Cabin with its lightmap UV set; returns the Cabin and each face's distance from
+    the nearest page eye that sees it (None where none does)"""
+    import numpy as np
+    from bpy_extras.mesh_utils import mesh_linked_uv_islands
+    from mathutils.kdtree import KDTree
+    # each seat back's vertices carry a vertex group of its mesh's name; each face the number of the part it came from
+    for name, parts in SEAT_BACK_PARTS.items():
+        for o in parts: o.vertex_groups.new(name=name).add(range(len(o.data.vertices)), 1.0, 'REPLACE')
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in static: o.select_set(True)
+    bpy.context.view_layer.objects.active = static[0]
+    bpy.ops.object.convert(target='MESH')
+    PART_NAMES[:] = [o.name for o in static]
+    for k, o in enumerate(static):
+        a = o.data.attributes.new('part', 'INT', 'FACE'); a.data.foreach_set('value', [k] * len(o.data.polygons))
+    bpy.ops.object.join(); cabin = bpy.context.object; cabin.name = 'Cabin'; me = cabin.data
+    while me.uv_layers: me.uv_layers.remove(me.uv_layers[0])
+    first = me.uv_layers.new(name='UVMap')     # TEXCOORD_0, unused and all zero; the lightmap is TEXCOORD_1
+    first.data.foreach_set('uv', [0.0] * (2 * len(first.data)))
+    uv = me.uv_layers.new(name='Lightmap'); me.uv_layers.active = uv
+    bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.004); bpy.ops.object.mode_set(mode='OBJECT')
+    dist = seen_from_page(cabin); W = cabin.matrix_world
+    uv = me.uv_layers['Lightmap']              # the layer as it is after edit mode
+    uvs = np.empty(2 * len(uv.data), dtype=np.float32); uv.data.foreach_get('uv', uvs); uvs = uvs.reshape(-1, 2)
+    centre = [W @ p.center for p in me.polygons]; faces_of = {}; count = {True: 0, False: 0}
+    for p in me.polygons:
+        for key in p.edge_keys: faces_of.setdefault(key, []).append(p.index)
+    for island in mesh_linked_uv_islands(me):
+        # the island's faces within KEEP of a seen one count as seen, at that one's distance
+        seen = [i for i in island if dist[i] is not None]
+        if seen and len(seen) < len(island):
+            kd = KDTree(len(seen))
+            for k, i in enumerate(seen): kd.insert(centre[i], k)
+            kd.balance()
+            for i in island:
+                if dist[i] is None:
+                    _, k, gap = kd.find(centre[i])
+                    if gap < KEEP: dist[i] = dist[seen[k]]
+        # the island's seen and unseen stretches are islands of their own, each scaled about its middle
+        left = set(island)
+        while left:
+            start = left.pop(); piece = [start]; kind = dist[start] is None
+            for i in piece:
+                for key in me.polygons[i].edge_keys:
+                    for j in faces_of[key]:
+                        if j in left and (dist[j] is None) == kind: left.discard(j); piece.append(j)
+            scale = UNSEEN if kind else math.sqrt(FAR / min(max(min(dist[i] for i in piece), NEAR), FAR)); count[kind] += 1
+            loops = [l for i in piece for l in me.polygons[i].loop_indices]; c = uvs[loops].mean(axis=0)
+            uvs[loops] = c + (uvs[loops] - c) * scale
+    print('MEASURE pieces seen', count[False], 'unseen', count[True])
+    unseen = np.array([d is None for d in dist]); loop_face = np.repeat(np.arange(len(me.polygons)), [p.loop_total for p in me.polygons])
+    hidden = unseen[loop_face]
+    def pack(faces, margin):
+        """pack the islands of the faces in the mask into the unit square; returns the lightmap UVs after it"""
+        uv = me.uv_layers['Lightmap']; uv.data.foreach_set('uv', uvs.ravel())
+        me.polygons.foreach_set('select', faces); me.edges.foreach_set('select', np.zeros(len(me.edges), dtype=bool))
+        vs = np.zeros(len(me.vertices), dtype=bool); lv = np.empty(len(me.loops), dtype=np.int32); me.loops.foreach_get('vertex_index', lv)
+        vs[lv[faces[loop_face]]] = True; me.vertices.foreach_set('select', vs)
+        bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_mode(type='FACE'); bpy.ops.mesh.hide(unselected=True)
+        bpy.ops.mesh.select_all(action='SELECT'); bpy.ops.uv.select_all(action='SELECT')
+        bpy.ops.uv.pack_islands(rotate=True, scale=True, margin_method='FRACTION', margin=margin)
+        bpy.ops.mesh.reveal(); bpy.ops.object.mode_set(mode='OBJECT')
+        out = np.empty(2 * len(me.loops), dtype=np.float32); me.uv_layers['Lightmap'].data.foreach_get('uv', out); return out.reshape(-1, 2)
+    # the unseen pieces packed close into a block of their own, which the seen pieces are then packed with as one
+    # island: a four-cornered unseen face stands in for the block and tells where the block landed
+    packed = pack(unseen, UNSEEN_MARGIN); lo = packed[hidden].min(axis=0); size = packed[hidden].max(axis=0) - lo
+    def girth(q): return sum(float(np.linalg.norm(q[list(p.loop_indices)] - np.roll(q[list(p.loop_indices)], 1, axis=0), axis=1).sum())
+                             for p in me.polygons if unseen[p.index])
+    grow = girth(uvs) / girth(packed)               # the block in the pieces' own units
+    block = (packed[hidden] - lo) * grow; size = size * grow
+    proxy = next(p for p in me.polygons if unseen[p.index] and p.loop_total == 4); corners = list(proxy.loop_indices)
+    uvs[corners] = [(0, 0), (size[0], 0), (size[0], size[1]), (0, size[1])]
+    faces = ~unseen; faces[proxy.index] = True
+    packed = pack(faces, PACK_MARGIN); o = packed[corners[0]]; ex = (packed[corners[1]] - o) / size[0]; ey = (packed[corners[3]] - o) / size[1]
+    uvs[:] = packed; uvs[hidden] = o + block[:, :1] * ex + block[:, 1:] * ey
+    inside = np.linalg.solve(np.array([ex * size[0], ey * size[1]]).T, (uvs[~hidden] - o).T).T
+    if ((inside > 0.001) & (inside < 0.999)).all(axis=1).any() or uvs.min() < -1e-4 or uvs.max() > 1 + 1e-4:
+        sys.exit('the lightmap UVs: a seen face lies in the unseen block, or a face lies off the map')
+    me.uv_layers['Lightmap'].data.foreach_set('uv', uvs.ravel())
+    me.polygons.foreach_set('select', np.ones(len(me.polygons), dtype=bool))
+    return cabin, dist
+def measure_uv(cabin, dist):
+    """MEASURE lines: each part's share of the lightmap and its texel size, and what the page's eyes never see"""
+    import numpy as np, re
+    me = cabin.data; n = len(me.polygons); W = cabin.matrix_world
+    uvs = np.empty(2 * len(me.uv_layers['Lightmap'].data), dtype=np.float64); me.uv_layers['Lightmap'].data.foreach_get('uv', uvs); uvs = uvs.reshape(-1, 2)
+    area = np.zeros(n); uv_area = np.zeros(n); part = np.zeros(n, dtype=np.int32); me.attributes['part'].data.foreach_get('value', part)
+    for p in me.polygons:
+        P = [W @ me.vertices[v].co for v in p.vertices]; q = uvs[list(p.loop_indices)]
+        area[p.index] = sum((P[k] - P[0]).cross(P[k + 1] - P[0]).length for k in range(1, len(P) - 1)) / 2
+        uv_area[p.index] = abs(sum(q[k][0] * q[(k + 1) % len(q)][1] - q[(k + 1) % len(q)][0] * q[k][1] for k in range(len(q)))) / 2
+    seen = np.array([d is not None for d in dist]); texel = np.sqrt(area / np.maximum(uv_area, 1e-12)) / SIZE * 1000
+    def median(mask):
+        if not mask.any() or area[mask].sum() == 0: return float('nan')
+        order = np.argsort(texel[mask]); w = np.cumsum(area[mask][order]); return float(texel[mask][order][np.searchsorted(w, w[-1] / 2)])
+    stems = {}
+    for k, o in enumerate(PART_NAMES): stems.setdefault(re.match(r'[A-Za-z]+', o).group(), []).append(k)
+    print(f'MEASURE lightmap {SIZE} px: {area.sum():.2f} m2 on {uv_area.sum() * 100:.1f}% of the map; never seen from the page '
+          f'{area[~seen].sum() / area.sum() * 100:.1f}% of the area on {uv_area[~seen].sum() / uv_area.sum() * 100:.1f}% of the covered map; '
+          f'median texel {median(seen):.2f} mm seen, {median(~seen):.2f} mm unseen')
+    for stem, ks in sorted(stems.items(), key=lambda kv: -uv_area[np.isin(part, kv[1])].sum()):
+        m = np.isin(part, ks); near = min((dist[i] for i in np.flatnonzero(m) if dist[i] is not None), default=float('nan'))
+        print(f'MEASURE uv {stem:12} {area[m].sum():6.3f} m2, seen {area[m & seen].sum() / max(area[m].sum(), 1e-12) * 100:5.1f}%, nearest eye {near:5.2f} m, '
+              f'map share {uv_area[m].sum() / uv_area.sum() * 100:5.1f}% (unseen faces {uv_area[m & ~seen].sum() / uv_area.sum() * 100:4.1f}%), '
+              f'texel {median(m & seen):5.2f} mm seen, {median(m & ~seen):5.2f} mm unseen')
+
 if MODE == 'wb':
     sc.render.engine = 'BLENDER_WORKBENCH'
     sh = sc.display.shading; sh.light = 'STUDIO'; sh.color_type = 'MATERIAL'; sh.show_shadows = True; sh.show_cavity = True
@@ -667,6 +839,10 @@ if MODE == 'wb':
     M['glass'].diffuse_color = (0.22, 0.23, 0.25, 1)    # the tinted glass over the sky, drawn opaque
     shoot('wb')
     measure()
+    sys.exit(0)
+
+if MODE == 'uv':
+    measure_uv(*unwrap())
     sys.exit(0)
 
 # ---------- Cycles ----------
@@ -693,20 +869,7 @@ shoot('day')
 
 # the side glass stays out of the bake
 for o in glass: o.hide_render = True
-
-# join the static cabin, lightmap UVs; each seat back's vertices carry a vertex group of its mesh's name
-for name, parts in SEAT_BACK_PARTS.items():
-    for o in parts: o.vertex_groups.new(name=name).add(range(len(o.data.vertices)), 1.0, 'REPLACE')
-bpy.ops.object.select_all(action='DESELECT')
-for o in static: o.select_set(True)
-bpy.context.view_layer.objects.active = static[0]
-bpy.ops.object.convert(target='MESH'); bpy.ops.object.join(); cabin = bpy.context.object; cabin.name = 'Cabin'
-while cabin.data.uv_layers: cabin.data.uv_layers.remove(cabin.data.uv_layers[0])
-first = cabin.data.uv_layers.new(name='UVMap')     # TEXCOORD_0, unused and all zero; the lightmap is TEXCOORD_1
-first.data.foreach_set('uv', [0.0] * (2 * len(first.data)))
-uv = cabin.data.uv_layers.new(name='Lightmap'); cabin.data.uv_layers.active = uv
-bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
-bpy.ops.uv.smart_project(angle_limit=math.radians(66), island_margin=0.004); bpy.ops.object.mode_set(mode='OBJECT')
+cabin, _ = unwrap()
 
 def bake(tag):
     img = bpy.data.images.new(f'light_{tag}', SIZE, SIZE, float_buffer=True)
