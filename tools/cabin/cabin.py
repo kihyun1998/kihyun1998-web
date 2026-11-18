@@ -664,23 +664,45 @@ ORBIT_MARGIN = 0.02                                   # the page's ORBIT_MARGIN
 ORBIT_R = ORBIT_C[1] - EYE_BOX[0][1] - ORBIT_MARGIN   # the page's fitOrbit round ORBIT_C in EYE_BOX: radius, polar and azimuth limits
 POLAR = [math.acos((EYE_BOX[i][2] - m - ORBIT_C[2]) / ORBIT_R) for i, m in ((1, ORBIT_MARGIN), (0, -ORBIT_MARGIN))]
 AZIMUTH = math.asin((EYE_BOX[1][0] - ORBIT_MARGIN) / ORBIT_R)
-ZOOM_D = SH / (2 * math.tan(math.radians(30)) * 0.62)   # the page's zoomed eye, in front of the screen centre
-VIEW_TAN = (math.tan(math.radians(64)), math.tan(math.radians(45)))   # half the widest view counted: 32:9 across, 90 deg tall (a view 0.36 wide for its height)
-PACK_MARGIN = 0.004                 # round each island, as a fraction of the map: 8 texels at 2048 px, the bake's margin
+FOV, MIN_FOV_ACROSS = 60, 40
+ZOOM_D = (SH / (2 * math.tan(math.radians(FOV / 2)) * 0.62), SW / (2 * math.tan(math.radians(MIN_FOV_ACROSS / 2)) * 0.9))
+VIEW_TAN = (math.tan(math.radians(MIN_FOV_ACROSS / 2)), math.tan(math.radians(FOV / 2)))
+ASPECTS = (0.28, 4.76)
+REACH = (VIEW_TAN[1] * ASPECTS[1], VIEW_TAN[0] / ASPECTS[0])
+RAY_STEP = math.radians(0.5)
+SWAY = (0.004, 0.004)
+MARGIN = 6
+PACK_MARGIN = MARGIN / SIZE
 UNSEEN, NEAR, FAR = 0.125, 0.3, 0.9   # an unseen piece's scale; a seen piece's is sqrt(FAR / its distance), the distance held between NEAR and FAR
 UNSEEN_MARGIN = 0.0005              # round each unseen piece, as a fraction of their block
 KEEP = 0.03                         # an unseen face this near a seen one of its island is sized with it
 def page_eyes(n_az=29, n_polar=15):
     """(eye, what it looks at) over the page's orbit, and along the zoom to the screen from its corners and the opening view"""
-    out = []; centre = Vector(ORBIT_C); screen = Vector((0, SCY, SCZ)); near = Vector((0, SCY - ZOOM_D, SCZ))
+    out = []; centre = Vector(ORBIT_C); screen = Vector((0, SCY, SCZ))
+    sways = [Vector((sx * SWAY[0], 0, sz * SWAY[1])) for sx in (-1, 1) for sz in (-1, 1)]
     def eye(az, polar): return centre + ORBIT_R * Vector((math.sin(polar) * math.sin(az), -math.sin(polar) * math.cos(az), math.cos(polar)))
+    def add(at, target, edge):
+        out.append((at, target))
+        if edge: out.extend((at + s, target + s) for s in sways)
     for i in range(n_az):
         for j in range(n_polar):
-            out.append((eye(AZIMUTH * (2 * i / (n_az - 1) - 1), POLAR[0] + (POLAR[1] - POLAR[0]) * j / (n_polar - 1)), centre))
+            add(eye(AZIMUTH * (2 * i / (n_az - 1) - 1), POLAR[0] + (POLAR[1] - POLAR[0]) * j / (n_polar - 1)), centre,
+                i in (0, n_az - 1) or j in (0, n_polar - 1))
     for az, polar in ((-AZIMUTH, POLAR[0]), (AZIMUTH, POLAR[0]), (-AZIMUTH, POLAR[1]), (AZIMUTH, POLAR[1]), (-0.3881, 1.4802)):
-        for z in (0.25, 0.5, 0.75, 1.0): out.append((eye(az, polar).lerp(near, z), centre.lerp(screen, z)))
+        for d in ZOOM_D:
+            for z in (0.25, 0.5, 0.75, 1.0): add(eye(az, polar).lerp(Vector((0, SCY - d, SCZ)), z), centre.lerp(screen, z), True)
     return out
-def seen_from_page(cabin, nx=360, ny=176):
+def view_rays():
+    out = []; step = math.tan(RAY_STEP)
+    def fan(reach):
+        top = math.atan(reach); n = math.ceil(2 * top / RAY_STEP); return [math.tan(top * (2 * (a + 0.5) / n - 1)) for a in range(n)]
+    def even(half): n = math.ceil(2 * half / step); return [half * (2 * (b + 0.5) / n - 1) for b in range(n)]
+    out += [(a, b) for a in fan(REACH[0]) for b in even(VIEW_TAN[1])]
+    out += [(a, b) for b in fan(REACH[1]) if abs(b) > VIEW_TAN[1] for a in even(VIEW_TAN[0])]
+    return out
+def in_view(across, up, along):
+    return along > 0 and ((across <= REACH[0] * along and up <= VIEW_TAN[1] * along) or (across <= VIEW_TAN[0] * along and up <= REACH[1] * along))
+def seen_from_page(cabin):
     """for each face of the joined Cabin, the distance from the nearest of the page's eyes that sees it, or None: rays
     over each eye's view, the Cabin Screen in the way, the side glass not, a seat back not while the page hides it"""
     from mathutils.bvhtree import BVHTree
@@ -698,25 +720,23 @@ def seen_from_page(cabin, nx=360, ny=176):
     def tree(hidden):
         if hidden not in trees:
             keep = [i for i in range(len(polys)) if back_of.get(i) not in hidden]
-            trees[hidden] = (BVHTree.FromPolygons(co + sv, [polys[i] for i in keep] + [tuple(range(n0, n0 + len(sv)))]), keep)
+            trees[hidden] = (BVHTree.FromPolygons(co + sv, [polys[i] for i in keep] + [tuple(n0 + v for v in scr.data.polygons[0].vertices)]), keep)
         return trees[hidden]
-    dist = [None] * len(polys); centre = [W @ p.center for p in me.polygons]; missed = None
+    dist = [None] * len(polys); centre = [W @ p.center for p in me.polygons]; missed = None; rays = view_rays()
     for eye, target in page_eyes():
         hidden = frozenset(n for n, b in boxes.items() if math.hypot(*(max(lo - eye[k], 0, eye[k] - hi) for k, (lo, hi) in enumerate(b))) < SEAT_BACK_NEAR)
         bvh, keep = tree(hidden)
         f = (target - eye).normalized(); r = f.cross(Vector((0, 0, 1))).normalized(); u = r.cross(f)
-        for a in range(nx):
-            ta = VIEW_TAN[0] * (2 * (a + 0.5) / nx - 1)
-            for b in range(ny):
-                _, _, i, d = bvh.ray_cast(eye, f + r * ta + u * (VIEW_TAN[1] * (2 * (b + 0.5) / ny - 1)))
-                if i is not None and i < len(keep) and (dist[keep[i]] is None or d < dist[keep[i]]): dist[keep[i]] = d
+        for ta, tb in rays:
+            _, _, i, d = bvh.ray_cast(eye, f + r * ta + u * tb)
+            if i is not None and i < len(keep) and (dist[keep[i]] is None or d < dist[keep[i]]): dist[keep[i]] = d
         # faces too small for that grid: a ray at the middle of each face the first eye's rays missed (of every face,
         # from the first eye)
         slot = {i: k for k, i in enumerate(keep)}
         for i in range(len(polys)) if missed is None else missed:
             if i not in slot: continue
             v = centre[i] - eye; along = v.dot(f)
-            if along <= 0 or abs(v.dot(r)) > VIEW_TAN[0] * along or abs(v.dot(u)) > VIEW_TAN[1] * along: continue
+            if not in_view(abs(v.dot(r)), abs(v.dot(u)), along): continue
             _, _, j, d = bvh.ray_cast(eye, v)
             if j == slot[i] and (dist[i] is None or d < dist[i]): dist[i] = d
         if missed is None: missed = [i for i in range(len(polys)) if dist[i] is None]
@@ -780,13 +800,15 @@ def unwrap():
         """pack the islands of the faces in the mask into the unit square; returns the lightmap UVs after it"""
         uv = me.uv_layers['Lightmap']; uv.data.foreach_set('uv', uvs.ravel())
         me.polygons.foreach_set('select', faces); me.edges.foreach_set('select', np.zeros(len(me.edges), dtype=bool))
-        vs = np.zeros(len(me.vertices), dtype=bool); lv = np.empty(len(me.loops), dtype=np.int32); me.loops.foreach_get('vertex_index', lv)
-        vs[lv[faces[loop_face]]] = True; me.vertices.foreach_set('select', vs)
-        bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_mode(type='FACE'); bpy.ops.mesh.hide(unselected=True)
+        me.vertices.foreach_set('select', np.zeros(len(me.vertices), dtype=bool))
+        bpy.context.tool_settings.mesh_select_mode = (False, False, True)
+        bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.hide(unselected=True)
         bpy.ops.mesh.select_all(action='SELECT'); bpy.ops.uv.select_all(action='SELECT')
         bpy.ops.uv.pack_islands(rotate=True, scale=True, margin_method='FRACTION', margin=margin)
         bpy.ops.mesh.reveal(); bpy.ops.object.mode_set(mode='OBJECT')
-        out = np.empty(2 * len(me.loops), dtype=np.float32); me.uv_layers['Lightmap'].data.foreach_get('uv', out); return out.reshape(-1, 2)
+        out = np.empty(2 * len(me.loops), dtype=np.float32); me.uv_layers['Lightmap'].data.foreach_get('uv', out); out = out.reshape(-1, 2)
+        if (np.abs(out - uvs)[~faces[loop_face]] > 1e-6).any(): sys.exit('the lightmap UVs: a pack moved faces it was not given')
+        return out
     # the unseen pieces packed close into a block of their own, which the seen pieces are then packed with as one
     # island: a four-cornered unseen face stands in for the block and tells where the block landed
     packed = pack(unseen, UNSEEN_MARGIN); lo = packed[hidden].min(axis=0); size = packed[hidden].max(axis=0) - lo
@@ -877,7 +899,7 @@ def bake(tag):
     for m in cabin.data.materials:
         n = m.node_tree.nodes.new('ShaderNodeTexImage'); n.image = img; m.node_tree.nodes.active = n
         u = m.node_tree.nodes.new('ShaderNodeUVMap'); u.uv_map = 'Lightmap'; m.node_tree.links.new(u.outputs['UV'], n.inputs['Vector'])
-    sc.cycles.samples = SAMPLES; sc.render.bake.margin = 8
+    sc.cycles.samples = SAMPLES; sc.render.bake.margin = MARGIN
     sc.render.bake.use_pass_direct = True; sc.render.bake.use_pass_indirect = True; sc.render.bake.use_pass_color = False
     t = time.time(); bpy.ops.object.bake(type='DIFFUSE'); print(f'TIME bake_{tag}_s {time.time() - t:.1f} size {SIZE} samples {SAMPLES}')
     img.filepath_raw = os.path.join(OUT, f'light_{tag}.hdr'); img.file_format = 'HDR'; img.save()

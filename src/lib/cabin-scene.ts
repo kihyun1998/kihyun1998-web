@@ -598,6 +598,7 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
           (light) => {
             light.flipY = false;
             light.channel = 1;
+            light.anisotropy = renderer.capabilities.getMaxAnisotropy();
             light.colorSpace = lightmapColorSpace(manifest.lightmaps[which].encoding);
             if (disposed) light.dispose();
             else cleanups.push(() => light.dispose());
