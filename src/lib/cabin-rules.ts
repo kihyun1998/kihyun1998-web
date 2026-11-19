@@ -156,15 +156,14 @@ export function lightmapColorSpace(encoding: string | undefined): 'srgb' {
   throw new Error(`The Cabin does not know the lightmap encoding ${JSON.stringify(encoding)}.`);
 }
 
-// A lightmap the manifest can list: each lighting's own, and the ambient
-// layer, the night's door bars, footwell light and dash strip baked in white.
+// A lightmap the manifest lists: each lighting's own, and the ambient layer,
+// the night's door bars, footwell light and dash strip baked in white.
 export type LightmapTag = Lighting | 'ambient';
 
-// The lightmaps `lighting` draws, in the order they add up, from the tags the
-// manifest lists: its own, then at night the ambient layer where the bake has
-// it.
-export function lightmapsFor(lighting: Lighting, listed: readonly string[]): LightmapTag[] {
-  return lighting === 'night' && listed.includes('ambient') ? ['night', 'ambient'] : [lighting];
+// The lightmaps `lighting` draws, in the order they add up: its own, then at
+// night the ambient layer.
+export function lightmapsFor(lighting: Lighting): LightmapTag[] {
+  return lighting === 'night' ? ['night', 'ambient'] : [lighting];
 }
 
 // A material's surface texture as the manifest lists it: the tile's size in

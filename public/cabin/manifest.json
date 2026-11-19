@@ -1,14 +1,19 @@
 {
-  "geometry": "cabin.ea3c20dc.glb",
+  "geometry": "cabin.a06ddcfe.glb",
   "lightmaps": {
     "day": {
-      "file": "light-day.9568136d.avif",
-      "scale": 2.25,
+      "file": "light-day.97af4805.avif",
+      "scale": 2.75,
       "encoding": "srgb-thrice"
     },
     "night": {
-      "file": "light-night.3d4213de.avif",
-      "scale": 13.0,
+      "file": "light-night.821af855.avif",
+      "scale": 3.0,
+      "encoding": "srgb-thrice"
+    },
+    "ambient": {
+      "file": "light-ambient.f219f83f.avif",
+      "scale": 16.5,
       "encoding": "srgb-thrice"
     }
   },
@@ -29,9 +34,9 @@
       "mean": 0.8004
     },
     "carpet": {
-      "file": "tex-carpet.d42fb47c.avif",
-      "tile": 0.1,
-      "mean": 0.799
+      "file": "tex-carpet.9298b15e.avif",
+      "tile": 0.6,
+      "mean": 0.3301
     }
   },
   "surfaces": {

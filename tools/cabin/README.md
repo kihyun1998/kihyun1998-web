@@ -79,10 +79,12 @@ Writes `out/light_day_dn.hdr`, `out/light_night_dn.hdr` and `out/light_ambient_d
 $BLENDER -b --factory-startup --python tools/cabin/textures.py
 ```
 
-Writes `out/tex_<kind>.png`, one seamless grey tile for each kind of surface (leather, felt, stipple, carpet), made
-from seeded noise, and `out/textures.json`: each kind's tile size in metres and which kind each Cabin material is drawn
-with. No image from elsewhere goes in. A few seconds; the tiles do not depend on the bake. Why they are made this way:
-`docs/map/home-room.md`, "The materials' surface textures".
+Writes `out/tex_<kind>.png`, one seamless grey tile for each kind of surface (leather, felt, stipple, carpet), and
+`out/textures.json`: each kind's tile size in metres and which kind each Cabin material is drawn with (it runs in Blender for its numpy and its image reader and writer, and removes the tiles and `textures.json` of the run before, so a failed run leaves none). Leather, felt
+and stipple are made from seeded noise. The carpet is made from a photo: Poly Haven's `dirty_carpet` (by Rohit Seervi,
+CC0), whose 2k colour map the script downloads into `out/` and checks against its SHA-256 before using it, so the first
+run needs the network. A few seconds; the tiles do not depend on the bake. Why they are made this way:
+`docs/map/home-room.md`, "The materials' surface textures" and "The sharp sun, the grilles and the photo carpet".
 
 ## 6. Compress
 
@@ -115,7 +117,7 @@ python3 tools/cabin/verify.py
 
 Checks that every file in `public/cabin/` is the one the manifest names, that each name matches its content, that
 the GLB is Draco-compressed with a `Cabin` mesh and `SeatBackLeft` and `SeatBackRight` meshes carrying lightmap UVs
-and a separate `Screen` mesh, that the lightmaps are day and night, and the ambient layer where the bake has it, all
+and a separate `Screen` mesh, that the lightmaps are day, night and the ambient layer, all
 AVIF of the same size, with `srgb-thrice` named as each one's encoding in the manifest, and that each surface
 tile is AVIF with a positive tile size and a mean in (0, 1], is used by some surface, and that every surface is a
 material of the GLB and names a listed tile. Then commit `tools/cabin/` and `public/cabin/` together.

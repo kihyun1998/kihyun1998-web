@@ -134,7 +134,7 @@ const ZOOM_MS = 900;
 
 const LOOKS = {
   day: {
-    light: 9,
+    light: 11,
     reflection: 0.4,
     ambient: 0,
     ambientGlow: 0,
@@ -175,7 +175,7 @@ const DOME_GLOW = '#fff1dc';
 const LAMP_GLOW = '#ffd9a6';
 
 type LightmapEntry = { file: string; scale: number; encoding: string };
-const LIGHTMAPS: Record<Lighting, LightmapEntry> & { ambient?: LightmapEntry } = manifest.lightmaps;
+const LIGHTMAPS: Record<LightmapTag, LightmapEntry> = manifest.lightmaps;
 type LoadedLightmap = { texture: THREE.Texture; scale: number };
 type LightMaps = { own: LoadedLightmap; ambient?: LoadedLightmap };
 
@@ -601,7 +601,6 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
     const lightmaps: Partial<Record<LightmapTag, Promise<LoadedLightmap>>> = {};
     const lightmap = (tag: LightmapTag) => {
       const entry = LIGHTMAPS[tag];
-      if (!entry) return Promise.reject(new Error(`The Cabin's manifest lists no ${tag} lightmap.`));
       return (lightmaps[tag] ??= new THREE.TextureLoader().loadAsync(ASSETS + entry.file).then(
         (light) => {
           light.flipY = false;
@@ -619,7 +618,7 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
       ));
     };
     const lightmapsOf = (which: Lighting): Promise<LightMaps> => {
-      const [own, ambient] = lightmapsFor(which, Object.keys(LIGHTMAPS)).map(lightmap);
+      const [own, ambient] = lightmapsFor(which).map(lightmap);
       return Promise.all([
         own,
         ambient?.catch((error) => {
