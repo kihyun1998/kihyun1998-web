@@ -1,5 +1,5 @@
 # Denoise baked lightmaps with OIDN through Blender's compositor (CPU, no Cycles). Run in headless Blender:
-#   blender -b --factory-startup --python denoise.py                              out/light_{day,night}.hdr -> *_dn.hdr
+#   blender -b --factory-startup --python denoise.py                              out/light_{day,night,ambient}.hdr -> *_dn.hdr
 #   blender -b --factory-startup --python denoise.py -- <in.hdr> <out.hdr> ...    explicit pairs
 import bpy, sys, os, time
 
@@ -7,7 +7,7 @@ OUT = os.environ.get('CABIN_OUT') or os.path.join(os.path.dirname(os.path.abspat
 args = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 if len(args) % 2: sys.exit('give <in.hdr> <out.hdr> pairs')
 pairs = list(zip(args[0::2], args[1::2])) or [
-    (os.path.join(OUT, f'light_{tag}.hdr'), os.path.join(OUT, f'light_{tag}_dn.hdr')) for tag in ('day', 'night')]
+    (os.path.join(OUT, f'light_{tag}.hdr'), os.path.join(OUT, f'light_{tag}_dn.hdr')) for tag in ('day', 'night', 'ambient')]
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 sc = bpy.context.scene

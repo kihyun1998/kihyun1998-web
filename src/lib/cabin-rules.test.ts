@@ -8,6 +8,7 @@ import {
   isNear,
   isTap,
   lightmapColorSpace,
+  lightmapsFor,
   surfaceTexture,
   type Bounds,
   type Point,
@@ -408,8 +409,31 @@ describe('lightmapColorSpace', () => {
 
   it('knows the encoding of every lightmap in the committed manifest', () => {
     const entries = Object.values(manifest.lightmaps) as { encoding?: string }[];
-    expect(entries).toHaveLength(2);
+    expect(entries.length).toBeGreaterThanOrEqual(2);
     for (const entry of entries) expect(lightmapColorSpace(entry.encoding)).toBe('srgb');
+  });
+});
+
+describe('lightmapsFor', () => {
+  it('draws the day with the day lightmap alone, ambient layer or not', () => {
+    expect(lightmapsFor('day', ['day', 'night', 'ambient'])).toEqual(['day']);
+    expect(lightmapsFor('day', ['day', 'night'])).toEqual(['day']);
+  });
+
+  it('adds the ambient layer to the night where the bake has it', () => {
+    expect(lightmapsFor('night', ['day', 'night', 'ambient'])).toEqual(['night', 'ambient']);
+  });
+
+  it('draws the night lightmap alone from a bake without the ambient layer', () => {
+    expect(lightmapsFor('night', ['day', 'night'])).toEqual(['night']);
+  });
+
+  it('reads a committed manifest that lists day and night, and the ambient layer where the bake has it', () => {
+    const listed = Object.keys(manifest.lightmaps).sort();
+    expect([
+      ['day', 'night'],
+      ['ambient', 'day', 'night'],
+    ]).toContainEqual(listed);
   });
 });
 

@@ -21,10 +21,12 @@ import {
   isNear,
   isTap,
   lightmapColorSpace,
+  lightmapsFor,
   surfaceTexture,
   type Bounds,
   type SurfaceTextureEntry,
   type Lighting,
+  type LightmapTag,
   type PressPoint,
 } from './cabin-rules';
 import {
@@ -130,15 +132,12 @@ const ZOOM_FILL_HEIGHT = 0.62;
 const ZOOM_FILL_WIDTH = 0.9;
 const ZOOM_MS = 900;
 
-// What changes with the lighting. `light` is the lightmap's level, on top of
-// its stored scale and the π between a Cycles diffuse bake and three.js
-// irradiance; `strip` and `dome` are the emissive levels of the dash light
-// strip and the dome lights; the rest is the street's sky, fog and lights.
 const LOOKS = {
   day: {
     light: 9,
     reflection: 0.4,
-    strip: 0,
+    ambient: 0,
+    ambientGlow: 0,
     dome: 0,
     top: '#4f8fd8',
     mid: '#cfe0ef',
@@ -155,7 +154,8 @@ const LOOKS = {
   night: {
     light: 9,
     reflection: 0.15,
-    strip: 1.6,
+    ambient: 1,
+    ambientGlow: 1.6,
     dome: 0.6,
     top: '#050817',
     mid: '#1b2347',
@@ -170,9 +170,14 @@ const LOOKS = {
     lamps: 2.6,
   },
 } satisfies Record<Lighting, object>;
-const STRIP_GLOW = '#ffd9a8';
+const AMBIENT_COLOUR = '#8c3cff';
 const DOME_GLOW = '#fff1dc';
 const LAMP_GLOW = '#ffd9a6';
+
+type LightmapEntry = { file: string; scale: number; encoding: string };
+const LIGHTMAPS: Record<Lighting, LightmapEntry> & { ambient?: LightmapEntry } = manifest.lightmaps;
+type LoadedLightmap = { texture: THREE.Texture; scale: number };
+type LightMaps = { own: LoadedLightmap; ambient?: LoadedLightmap };
 
 const PIXEL_RATIOS = [1.5, 1.25, 1];
 // A frame's cost above which the resolution steps down, and above which, at
@@ -429,13 +434,17 @@ const CABIN_LIGHT_CHUNK = THREE.ShaderChunk.lights_fragment_maps
   .replace(ENVIRONMENT_DIFFUSE, '')
   .replace(
     LIGHTMAP_LIGHT,
-    'vec3 lightMapIrradiance = sRGBTransferEOTF( sRGBTransferEOTF( lightMapTexel ) ).rgb * lightMapIntensity;',
+    `vec3 lightMapIrradiance = sRGBTransferEOTF( sRGBTransferEOTF( lightMapTexel ) ).rgb * lightMapIntensity
+      + sRGBTransferEOTF( sRGBTransferEOTF( texture2D( cabinAmbientMap, vLightMapUv ) ) ).rgb * cabinAmbientLight;`,
   );
 
-// Makes a material take its diffuse light from the lightmap alone, decoded to
-// linear light: the environment map then adds reflections and no diffuse light.
-function cabinLight(shader: { fragmentShader: string }) {
-  shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_maps>', CABIN_LIGHT_CHUNK);
+type AmbientLayer = { cabinAmbientMap: { value: THREE.Texture }; cabinAmbientLight: { value: THREE.Color } };
+
+function cabinLight(shader: ShaderParts, ambient: AmbientLayer) {
+  Object.assign(shader.uniforms, ambient);
+  shader.fragmentShader =
+    'uniform sampler2D cabinAmbientMap;\nuniform vec3 cabinAmbientLight;\n' +
+    shader.fragmentShader.replace('#include <lights_fragment_maps>', CABIN_LIGHT_CHUNK);
 }
 
 // The lines in three.js's standard material shaders that apply the colour map
@@ -589,32 +598,41 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
     const draco = new DRACOLoader().setDecoderPath(DRACO_GLTF_CONFIG);
     cleanups.push(() => draco.dispose());
 
-    // Each lighting's lightmap, loaded when that lighting is first asked for.
-    const lightmaps: Partial<Record<Lighting, Promise<THREE.Texture>>> = {};
-    const lightmap = (which: Lighting) =>
-      (lightmaps[which] ??= new THREE.TextureLoader()
-        .loadAsync(ASSETS + manifest.lightmaps[which].file)
-        .then(
-          (light) => {
-            light.flipY = false;
-            light.channel = 1;
-            light.anisotropy = renderer.capabilities.getMaxAnisotropy();
-            light.colorSpace = lightmapColorSpace(manifest.lightmaps[which].encoding);
-            if (disposed) light.dispose();
-            else cleanups.push(() => light.dispose());
-            return light;
-          },
-          (error) => {
-            // The next request for this lighting fetches it again.
-            delete lightmaps[which];
-            throw error;
-          },
-        ));
+    const lightmaps: Partial<Record<LightmapTag, Promise<LoadedLightmap>>> = {};
+    const lightmap = (tag: LightmapTag) => {
+      const entry = LIGHTMAPS[tag];
+      if (!entry) return Promise.reject(new Error(`The Cabin's manifest lists no ${tag} lightmap.`));
+      return (lightmaps[tag] ??= new THREE.TextureLoader().loadAsync(ASSETS + entry.file).then(
+        (light) => {
+          light.flipY = false;
+          light.channel = 1;
+          light.anisotropy = renderer.capabilities.getMaxAnisotropy();
+          light.colorSpace = lightmapColorSpace(entry.encoding);
+          if (disposed) light.dispose();
+          else cleanups.push(() => light.dispose());
+          return { texture: light, scale: entry.scale };
+        },
+        (error) => {
+          delete lightmaps[tag];
+          throw error;
+        },
+      ));
+    };
+    const lightmapsOf = (which: Lighting): Promise<LightMaps> => {
+      const [own, ambient] = lightmapsFor(which, Object.keys(LIGHTMAPS)).map(lightmap);
+      return Promise.all([
+        own,
+        ambient?.catch((error) => {
+          console.error('The Cabin could not load its ambient light; the night is drawn without it.', error);
+          return undefined;
+        }),
+      ]).then(([own, ambient]) => ({ own, ambient }));
+    };
 
     const first = lighting;
     Promise.all([
       new GLTFLoader().setDRACOLoader(draco).loadAsync(ASSETS + manifest.geometry),
-      lightmap(first),
+      lightmapsOf(first),
     ])
       .then(([gltf, light]) => {
         if (disposed) {
@@ -625,7 +643,7 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
       })
       .catch(fail);
 
-    function run(cabin: THREE.Object3D, firstLighting: Lighting, firstLight: THREE.Texture) {
+    function run(cabin: THREE.Object3D, firstLighting: Lighting, firstLight: LightMaps) {
       // The Cabin Screen's drawing, kept as the canvas its texture reads.
       const screenCanvas = document.createElement('canvas');
       screenCanvas.width = SCREEN_WIDTH;
@@ -677,7 +695,14 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
       });
 
       const lit: THREE.MeshStandardMaterial[] = [];
-      const glows: { material: THREE.MeshStandardMaterial; level: 'strip' | 'dome' }[] = [];
+      const glows: { material: THREE.MeshStandardMaterial; level: 'ambientGlow' | 'dome' }[] = [];
+      const noLight = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
+      noLight.needsUpdate = true;
+      cleanups.push(() => noLight.dispose());
+      const ambient: AmbientLayer = {
+        cabinAmbientMap: { value: noLight },
+        cabinAmbientLight: { value: new THREE.Color(0, 0, 0) },
+      };
       let screen: THREE.Mesh | null = null;
       cabin.traverse((object) => {
         const mesh = object as THREE.Mesh;
@@ -692,12 +717,12 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
         if (mesh.name === 'Glass') return;
         for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
           const standard = material as THREE.MeshStandardMaterial;
-          standard.onBeforeCompile = cabinLight;
+          standard.onBeforeCompile = (shader) => cabinLight(shader, ambient);
           standard.customProgramCacheKey = () => 'cabin-light';
           lit.push(standard);
-          if (standard.name === 'strip') {
-            standard.emissive.set(STRIP_GLOW);
-            glows.push({ material: standard, level: 'strip' });
+          if (standard.name === 'strip' || standard.name === 'ambient') {
+            standard.emissive.set(AMBIENT_COLOUR);
+            glows.push({ material: standard, level: 'ambientGlow' });
           } else if (standard.name === 'dome') {
             standard.emissive.set(DOME_GLOW);
             glows.push({ material: standard, level: 'dome' });
@@ -740,7 +765,7 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
               material.map = map;
               material.color.multiplyScalar(colorGain);
               material.onBeforeCompile = (shader) => {
-                cabinLight(shader);
+                cabinLight(shader, ambient);
                 projectedMap(shader, repeat);
               };
               material.customProgramCacheKey = () => 'cabin-light-projected';
@@ -750,19 +775,22 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
           .catch((error) => console.error(`The Cabin could not load the surface texture ${kind}.`, error));
       }
 
-      // Puts the street, the reflection of it, the cabin's light and the
-      // Cabin Screen in `which` lighting, lit by `light`.
-      const light = (which: Lighting, map: THREE.Texture) => {
+      const light = (which: Lighting, maps: LightMaps) => {
         const look = LOOKS[which];
+        const strength = ({ scale }: LoadedLightmap) => look.light * scale * Math.PI;
         street.setLighting(which);
         reflection?.dispose();
         reflection = pmrem.fromScene(street.scene, 0.04, 0.1, FAR, { position: REFLECTION_EYE });
         cabinScene.environment = reflection.texture;
         cabinScene.environmentIntensity = look.reflection;
         for (const material of lit) {
-          material.lightMap = map;
-          material.lightMapIntensity = look.light * manifest.lightmaps[which].scale * Math.PI;
+          material.lightMap = maps.own.texture;
+          material.lightMapIntensity = strength(maps.own);
         }
+        ambient.cabinAmbientMap.value = maps.ambient?.texture ?? noLight;
+        ambient.cabinAmbientLight.value
+          .set(AMBIENT_COLOUR)
+          .multiplyScalar(maps.ambient ? look.ambient * strength(maps.ambient) : 0);
         for (const { material, level } of glows) material.emissiveIntensity = look[level];
         drawnLighting = which;
         paint();
@@ -770,9 +798,9 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
       light(firstLighting, firstLight);
       show.lighting = () => {
         const asked = lighting;
-        lightmap(asked)
-          .then((map) => {
-            if (!disposed && lighting === asked && drawnLighting !== asked) light(asked, map);
+        lightmapsOf(asked)
+          .then((maps) => {
+            if (!disposed && lighting === asked && drawnLighting !== asked) light(asked, maps);
           })
           .catch((error) => console.error('The Cabin could not load its lightmap.', error));
       };

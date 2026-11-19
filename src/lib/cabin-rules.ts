@@ -1,8 +1,9 @@
 // The Cabin's rules as plain functions of their inputs: what counts as a tap
 // on the Cabin Screen, the orbit that keeps the eye inside the cabin, whether
 // the eye is near a box, the field of view of a narrow view, the colour space
-// a lightmap's encoding is uploaded in, which lighting a theme means, and
-// whether a visitor gets the Cabin or the Reading Home.
+// a lightmap's encoding is uploaded in, the lightmaps each lighting draws,
+// which lighting a theme means, and whether a visitor gets the Cabin or the
+// Reading Home.
 // Nothing here touches the DOM or three.js.
 // See docs/adr/0011-home-is-a-cabin-over-a-reading-home.md and
 // docs/map/home-room.md.
@@ -153,6 +154,17 @@ export function fovFor(aspect: number, fov: number, minAcross: number): number {
 export function lightmapColorSpace(encoding: string | undefined): 'srgb' {
   if (encoding === 'srgb-thrice') return 'srgb';
   throw new Error(`The Cabin does not know the lightmap encoding ${JSON.stringify(encoding)}.`);
+}
+
+// A lightmap the manifest can list: each lighting's own, and the ambient
+// layer, the night's door bars, footwell light and dash strip baked in white.
+export type LightmapTag = Lighting | 'ambient';
+
+// The lightmaps `lighting` draws, in the order they add up, from the tags the
+// manifest lists: its own, then at night the ambient layer where the bake has
+// it.
+export function lightmapsFor(lighting: Lighting, listed: readonly string[]): LightmapTag[] {
+  return lighting === 'night' && listed.includes('ambient') ? ['night', 'ambient'] : [lighting];
 }
 
 // A material's surface texture as the manifest lists it: the tile's size in
