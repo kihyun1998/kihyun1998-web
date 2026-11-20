@@ -1,17 +1,5 @@
 'use client';
 
-// The Cabin over the Reading Home. The server renders nothing here; in the
-// browser the Cabin-or-Reading-Home rule decides whether the Cabin covers the
-// page, and a switch lets the visitor choose and stores the choice. What it
-// draws goes into <body>, outside the page's <main>. It lifts the loading
-// cover the <head> script put up once the Cabin is ready or not coming. The
-// Cabin takes its lighting from the theme and the Cabin Screen's language
-// from the Language Toggle, and a nav entry zooms it to that tab; while it is
-// zoomed, the tab the Cabin Screen shows is the shown section the nav entries
-// mark. While it is shown, <html> carries HOME_ATTRIBUTE, on which globals.css
-// lifts the site header over it, and the page under it is inert.
-// See docs/adr/0011-home-is-a-cabin-over-a-reading-home.md.
-
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
@@ -34,15 +22,12 @@ import { HOME_SECTION_EVENT, sectionFromHash, shownSection } from '@/lib/home';
 import { isDarkNow, themeStore } from '@/lib/theme';
 import { useLanguage } from '@/components/language';
 
-// On <html> while the Cabin is shown and ready.
 const HOME_ATTRIBUTE = 'data-home';
 
 const lightingNow = (): Lighting => (isDarkNow() ? 'night' : 'day');
 
 const homeStore = createClientStore();
 
-// The stored values as this page load knows them: what it wrote, over what
-// localStorage held. They outlive the page only where localStorage works.
 const written = new Map<string, string | null>();
 const read = (key: string) => {
   if (written.has(key)) return written.get(key) ?? null;
@@ -61,9 +46,6 @@ const write = (key: string, value: string | null) => {
   homeStore.notify();
 };
 
-// Whether this browser decodes AVIF on this page load, by `avifFor` from the
-// probe result stored when the load began and this load's probe answer. The
-// probe runs either way and stores its answer for the next load.
 let probing = false;
 let storedAvif: string | null = null;
 let probeAnswer: boolean | null = null;
@@ -79,8 +61,6 @@ const decodesAvif = () => {
   return avifFor(storedAvif, probeAnswer);
 };
 
-// Whether this browser has WebGL 2 and, on this page load, the Cabin has not
-// failed to start.
 let webgl: boolean | null = null;
 let broken = false;
 const startable = () => {
@@ -94,13 +74,8 @@ const startable = () => {
   return webgl && !broken;
 };
 
-// Whether this browser can run the Cabin: it is startable and decodes AVIF.
-// Null while the AVIF probe has not answered.
 const canRun = (): boolean | null => (startable() ? decodesAvif() : false);
 
-// The Cabin was not ready within the cover's limit on this page load: the
-// Reading Home, with the switch, until the visitor presses it. `lateSeen`
-// keeps a give-up recorded on <html> from counting twice.
 let late = false;
 let lateSeen = false;
 const notInTime = () => {
@@ -112,8 +87,6 @@ const notInTime = () => {
   homeStore.notify();
 };
 
-// The Cabin is not coming on this page load: the Reading Home, without the
-// switch, until the next load.
 const giveUp = () => {
   broken = true;
   liftCover(document.documentElement);
@@ -137,7 +110,6 @@ const homeNow = (): Home | null => {
   });
 };
 
-// The server cannot know any of it, so it reports nothing and renders nothing.
 const unknownOnServer = () => null;
 
 const switchClass =
@@ -153,8 +125,6 @@ export function Cabin() {
     if (decided && !cabin) liftCover(document.documentElement);
   }, [decided, cabin]);
 
-  // The <head> script gives up when the Cabin is not ready in time; leaving
-  // the home page lifts the cover.
   useEffect(() => {
     const root = document.documentElement;
     window.addEventListener(COVER_GAVE_UP_EVENT, notInTime);
@@ -170,15 +140,12 @@ export function Cabin() {
   return createPortal(<Layer home={home} />, document.body);
 }
 
-// The switch to the Cabin, or the Cabin with the switch to the Reading Home.
 function Layer({ home }: { home: Home }) {
   if (home === 'reading-home') {
     return (
       <button
         type="button"
         onClick={() => {
-          // Choosing the Cabin runs the frame test again, and tries again
-          // after a load that ran out of time.
           late = false;
           write(FRAME_TEST_KEY, null);
           write(CHOICE_KEY, 'cabin');
@@ -206,8 +173,6 @@ function Layer({ home }: { home: Home }) {
   );
 }
 
-// The full-screen layer the Cabin is drawn in, with its loading state and the
-// Back control shown while zoomed to the Cabin Screen.
 function CabinStage() {
   const stage = useRef<HTMLDivElement>(null);
   const scene = useRef<CabinScene | null>(null);
@@ -216,7 +181,6 @@ function CabinStage() {
   const router = useRouter();
   const { language } = useLanguage();
   const lighting = useSyncExternalStore(themeStore.subscribe, lightingNow, lightingNow);
-  // What the scene starts with when it has loaded: the values of that moment.
   const latest = useRef({ language, lighting });
   useEffect(() => {
     latest.current = { language, lighting };
@@ -239,8 +203,6 @@ function CabinStage() {
             onView: (view) => {
               setZoomed(view.zoomed);
               shownSection.set(view);
-              // Back at the seat, a section's hash no longer says where the
-              // Cabin is.
               if (!view.zoomed && window.location.hash) {
                 const { pathname, search } = window.location;
                 window.history.replaceState(window.history.state, '', pathname + search);
@@ -275,7 +237,6 @@ function CabinStage() {
     };
   }, [router]);
 
-  // A nav entry zooms to its tab.
   useEffect(() => {
     const show = (event: Event) => {
       const tab = sectionFromHash(`#${(event as CustomEvent<string>).detail}`);
@@ -292,9 +253,6 @@ function CabinStage() {
     return () => root.removeAttribute(HOME_ATTRIBUTE);
   }, [ready]);
 
-  // The page under the layer takes no focus and is left out of the
-  // accessibility tree: all of <main> while the Cabin loads, and all of it
-  // but the site header once the header lies over the Cabin.
   useEffect(() => {
     const covered = Array.from(document.querySelectorAll<HTMLElement>('main > *')).filter(
       (element) => !(ready && element.classList.contains('site-header')),
@@ -305,7 +263,6 @@ function CabinStage() {
     };
   }, [ready]);
 
-  // The Reading Home underneath does not scroll while the Cabin covers it.
   useEffect(() => {
     const root = document.documentElement;
     const before = root.style.overflow;

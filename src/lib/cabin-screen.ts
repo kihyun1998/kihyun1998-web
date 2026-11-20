@@ -1,11 +1,3 @@
-// The Cabin Screen's drawing: what each tab shows, from the same data as the
-// Reading Home, laid out as a list of fills and texts on a 1600×1200 canvas
-// with the zones a pointer can press. `layoutScreen` is a plain function of
-// its inputs and a text-measuring function; `paintScreen` puts its result on
-// a canvas.
-// See docs/adr/0011-home-is-a-cabin-over-a-reading-home.md and
-// docs/map/home-room.md ("The Cabin Screen").
-
 import type { Lighting } from './cabin-rules';
 import { HOME_LIMIT, HOME_SECTIONS, type HomeSectionId } from './home';
 import { identityStatement, type Language } from './i18n';
@@ -16,21 +8,16 @@ import { BLOG_URL, GITHUB_URL } from './site';
 export const SCREEN_WIDTH = 1600;
 export const SCREEN_HEIGHT = 1200;
 
-// One pressable row: where it leads, and the tag and description drawn with
-// its name. An `href` starting with '/' stays on this site.
 export type ScreenItem = { name: string; meta?: string; description?: string; href: string };
 
 export type ScreenContent = {
   title: string;
   lede?: string;
-  // The Identity Statement, on the About tab.
   statement?: string;
   items: ScreenItem[];
-  // The full-list page of a capped list.
   seeAll?: string;
 };
 
-// The lists the tabs are filled from; the site's own unless given.
 export type ScreenData = { openSource: OpenSourceRow[]; projects: Project[] };
 
 const siteData: ScreenData = { openSource: openSourceRows, projects };
@@ -82,16 +69,11 @@ export type ScreenState = {
   tab: HomeSectionId;
   language: Language;
   lighting: Lighting;
-  // The `key` of the zone under the pointer.
   hover: string | null;
-  // The clock, as HH:MM.
   time: string;
-  // The car's speed in km/h.
   speed: number;
 };
 
-// A pressable rectangle in canvas pixels: a tab, or an item and where it
-// leads. `key` names it across layouts.
 export type Zone = { key: string; x0: number; y0: number; x1: number; y1: number } & (
   | { kind: 'tab'; tab: HomeSectionId }
   | { kind: 'item'; href: string }
@@ -107,8 +89,6 @@ export type RectOp = {
   color: string;
 };
 
-// A line of text, vertically centred on `y`. `font` is a CSS font without its
-// family.
 export type TextOp = {
   type: 'text';
   text: string;
@@ -148,7 +128,6 @@ const DESCRIPTION_FONT = '400 30px';
 const SEE_ALL_FONT = '500 40px';
 const SEE_ALL = 'See all →';
 
-// `text`, cut and ended with an ellipsis where it is wider than `width`.
 function fit(text: string, font: string, width: number, measure: Measure) {
   if (measure(text, font) <= width) return text;
   let kept = text;
@@ -156,7 +135,6 @@ function fit(text: string, font: string, width: number, measure: Measure) {
   return `${kept}…`;
 }
 
-// `text` broken at spaces into lines no wider than `width`.
 function wrap(text: string, font: string, width: number, measure: Measure) {
   const lines: string[] = [];
   let line = '';
@@ -173,7 +151,6 @@ function wrap(text: string, font: string, width: number, measure: Measure) {
   return lines;
 }
 
-// The whole screen for `state`: what to draw, back to front, and the zones.
 export function layoutScreen(
   state: ScreenState,
   measure: Measure,
@@ -254,12 +231,10 @@ export function layoutScreen(
   return { ops, zones };
 }
 
-// The zone holding the canvas point (x, y), or null.
 export function zoneAt(zones: Zone[], x: number, y: number): Zone | null {
   return zones.find((zone) => x >= zone.x0 && x <= zone.x1 && y >= zone.y0 && y <= zone.y1) ?? null;
 }
 
-// Draws `ops` in order, with texts in `family`.
 export function paintScreen(context: CanvasRenderingContext2D, ops: ScreenOp[], family: string) {
   context.textBaseline = 'middle';
   for (const op of ops) {

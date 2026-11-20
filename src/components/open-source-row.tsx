@@ -2,10 +2,6 @@ import { Package as PackageIcon } from 'lucide-react';
 import { InternalLinkRow } from '@/components/lists';
 import type { Package, OpenSourceRow as Row } from '@/lib/open-source';
 
-// One derived Open Source row. A Package leaves for its registry or its repo;
-// a Family stays on this site. Shared by the home page and /open-source so both
-// render a Family the same way — collapsed, never expanded inline.
-// See docs/adr/0007-package-families.md.
 export function OpenSourceRow({ row }: { row: Row }) {
   if (row.kind === 'family') {
     return (
@@ -38,10 +34,6 @@ const registryName = {
 const iconLinkClassName =
   'inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground';
 
-// A Package row has two destinations, so the name is plain text and each
-// destination gets its own icon link. The Ecosystem tag beside them says which
-// registry the package icon opens; the icon itself is the same for all three.
-// See docs/adr/0009-package-rows-link-registry-and-repo.md.
 export function PackageRow({ pkg }: { pkg: Package }) {
   const registry = registryName[pkg.ecosystem];
 

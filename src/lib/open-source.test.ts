@@ -13,10 +13,6 @@ import {
   type Package,
 } from './open-source';
 
-// Tests assert on the list a visitor would see — the sequence of rows, their
-// kinds, names, and meta — not on how the grouping is computed. Validation
-// rules are driven with fixtures so the real curated arrays are never mutated.
-
 const pkg = (name: string, ecosystem: Ecosystem): Package => ({
   name,
   ecosystem,
@@ -24,8 +20,6 @@ const pkg = (name: string, ecosystem: Ecosystem): Package => ({
   repo: `https://example.test/repo/${name}`,
 });
 
-// A miniature catalogue with the same shape as the real one: an ecosystem
-// cluster, then a family that straddles two ecosystems, then loose packages.
 const fixturePackages: Package[] = [
   pkg('alpha_widget', 'Flutter'),
   pkg('beta_widget', 'Flutter'),
@@ -417,7 +411,6 @@ describe('the curated catalogue', () => {
     );
 
     expect(justpdf).toMatchObject({ name: 'justpdf', memberCount: 10 });
-    // The Family and its flagship member share a name; only the Family shows.
     expect(
       openSourceRows.filter((row) => row.name === 'justpdf'),
     ).toHaveLength(1);

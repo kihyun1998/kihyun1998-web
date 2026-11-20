@@ -16,8 +16,6 @@ const links: LayoutLink[] = [
 ];
 
 describe('settle', () => {
-  // The server renders the settled layout and the browser hydrates it; the
-  // two only agree if settling is a pure function of its input.
   it('lands on the same layout every time', () => {
     expect(settle(ids, links)).toEqual(settle(ids, links));
   });

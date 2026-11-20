@@ -1,9 +1,3 @@
-# The Cabin: geometry, Workbench previews, day, night and ambient lightmap bakes, GLB export. Run in headless Blender:
-#   blender -b --factory-startup --python cabin.py -- wb                          ten Workbench previews (no Cycles), MEASURE lines
-#   blender -b --factory-startup --python cabin.py -- uv [size]                    the lightmap's UVs laid out (no Cycles), MEASURE lines
-#   blender -b --factory-startup --python cabin.py -- bake [size] [samples]       Cycles: ten day renders, day, night
-#                                                                                 and ambient diffuse lightmaps, cabin.glb
-# Output goes to $CABIN_OUT, or to out/ beside this file.
 # Blender axes: x right, y forward, z up. glTF export maps (x, y, z) -> three.js (x, z, -y).
 import bpy, bmesh, math, mathutils, time, os, sys
 from mathutils import Vector, Matrix
@@ -41,9 +35,8 @@ M = {
     'road': mat('road', '#a8a8a8', 0.9),
 }
 
-# ---------- mesh helpers ----------
-static = []     # joined into the baked Cabin mesh
-glass = []      # the side glass: exported as its own mesh, kept out of the bake
+static = []
+glass = []
 def finish(o, material, bevel=0.0, sub=0, solid=0.0, keep=True, smooth=True):
     sc.collection.objects.link(o); o.data.materials.append(M[material])
     if solid: md = o.modifiers.new('so', 'SOLIDIFY'); md.thickness = solid; md.offset = 0
@@ -51,7 +44,7 @@ def finish(o, material, bevel=0.0, sub=0, solid=0.0, keep=True, smooth=True):
     if sub: md = o.modifiers.new('ss', 'SUBSURF'); md.levels = md.render_levels = sub
     if smooth:
         for p in o.data.polygons: p.use_smooth = True
-        if not sub:     # keep creases between faces meeting at over 40 degrees
+        if not sub:
             bm = bmesh.new(); bm.from_mesh(o.data)
             for e in bm.edges: e.smooth = not (e.is_manifold and e.calc_face_angle(0) > math.radians(40))
             bm.to_mesh(o.data); bm.free()
@@ -69,13 +62,11 @@ def cylinder(name, r, depth, loc, material, verts=24):
     bm = bmesh.new(); bmesh.ops.create_cone(bm, cap_ends=True, segments=verts, radius1=r, radius2=r, depth=depth)
     o = finish(mesh_from(name, bm), material, 0.003); o.location = loc; return o
 def grid(name, rows, material, sub=0, solid=0.0, keep=True):
-    """a quad sheet through rows of points, every row the same length"""
     bm = bmesh.new(); V = [[bm.verts.new(p) for p in r] for r in rows]
     for r0, r1 in zip(V, V[1:]):
         for k in range(len(r0) - 1): bm.faces.new((r0[k], r0[k + 1], r1[k + 1], r1[k]))
     return finish(mesh_from(name, bm), material, 0, sub, solid, keep)
 def spline(pts, n=6):
-    """Catmull-Rom through pts, n samples per span"""
     P = [Vector(p) for p in pts]; out = []
     for i in range(len(P) - 1):
         p0, p1, p2, p3 = P[max(i - 1, 0)], P[i], P[i + 1], P[min(i + 2, len(P) - 1)]
@@ -84,15 +75,12 @@ def spline(pts, n=6):
             out.append(0.5 * (2 * p1 + (p2 - p0) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (3 * p1 - p0 - 3 * p2 + p3) * t ** 3))
     out.append(P[-1]); return out
 def rrect(w, h, r, k=3):
-    """a rounded rectangle centred on the origin, as (a, b) points"""
     pts = []
     for cx, cy, a0 in ((w / 2 - r, h / 2 - r, 0), (-w / 2 + r, h / 2 - r, 90), (-w / 2 + r, -h / 2 + r, 180), (w / 2 - r, -h / 2 + r, 270)):
         for i in range(k + 1):
             a = math.radians(a0 + 90 * i / k); pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
     return pts
 def sweep(name, path, profile, normal_of, material, sub=0, caps=True):
-    """closed 2-D profile (a, b) swept along path: b runs along normal_of(point, tangent) made square to the
-    tangent, a along tangent x normal"""
     bm = bmesh.new(); rings = []
     pts = [Vector(p[:3]) for p in path]
     for i, p in enumerate(pts):
@@ -106,7 +94,6 @@ def sweep(name, path, profile, normal_of, material, sub=0, caps=True):
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     return finish(mesh_from(name, bm), material, 0, sub)
 def loft(name, rings, material, bevel=0.0, sub=0):
-    """closed rings of points, every ring the same length, joined in order and capped at both ends"""
     bm = bmesh.new(); V = [[bm.verts.new(p) for p in r] for r in rings]; m = len(rings[0])
     for r0, r1 in zip(V, V[1:]):
         for k in range(m): bm.faces.new((r0[k], r0[(k + 1) % m], r1[(k + 1) % m], r1[k]))
@@ -114,8 +101,6 @@ def loft(name, rings, material, bevel=0.0, sub=0):
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     return finish(mesh_from(name, bm), material, bevel, sub)
 def ribbon(name, inner, outer, material, thick=0.016, k=12, face=None):
-    """a band between two edge curves (points paired in order), its cross-section a rounded slab bulging toward
-    face (a point): one surface with no crease along its length"""
     bm = bmesh.new(); rings = []; n = len(inner); F = Vector(face or EYE)
     A = [Vector(p) for p in inner]; B = [Vector(p) for p in outer]; mid = [(a + b) / 2 for a, b in zip(A, B)]
     for i in range(n):
@@ -134,14 +119,12 @@ def ribbon(name, inner, outer, material, thick=0.016, k=12, face=None):
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     return finish(mesh_from(name, bm), material, 0, 0)
 def interp(table, x):
-    """piecewise-linear lookup in [(x, y), ...] sorted by x"""
     if x <= table[0][0]: return table[0][1]
     for (x0, y0), (x1, y1) in zip(table, table[1:]):
         if x <= x1: return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
     return table[-1][1]
 def smooth01(t): t = max(0.0, min(1.0, t)); return t * t * (3 - 2 * t)
 def smooth_interp(table, x):
-    """monotone cubic Hermite lookup in [(x, y), ...] sorted by x, harmonic-mean slopes: through every point, no overshoot"""
     if x <= table[0][0]: return table[0][1]
     if x >= table[-1][0]: return table[-1][1]
     X = [p[0] for p in table]; Y = [p[1] for p in table]; n = len(X)
@@ -152,59 +135,45 @@ def smooth_interp(table, x):
             + (t ** 3 - t * t) * h * m[i + 1])
 def mirror(pts): return [(-p[0], *p[1:]) for p in reversed(pts)] + [tuple(p) for p in pts[1:]]
 
-# ---------- dimensions (metres; z is height above the road) ----------
 FLOOR = 0.2
-DASH_Y, DASH_Z, DASH_LOW = 0.975, 0.92, 0.745   # dash lip (y), top (z) and underside (z)
-WS_Y, WS_Z = 1.50, 0.935             # windscreen base
-GLASS_Y = 1.37                       # front corner of the side glass, the door's front end at the sill
-BP_Y = -0.04                         # the B-pillar's foot on the sill
-BACK = -0.39                         # the partition behind the seats
-DOOR_Y0, DOOR_Y1 = BACK + 0.06, WS_Y - 0.06     # the door cards' rear and front ends
+DASH_Y, DASH_Z, DASH_LOW = 0.975, 0.92, 0.745
+WS_Y, WS_Z = 1.50, 0.935
+GLASS_Y = 1.37
+BP_Y = -0.04
+BACK = -0.39
+DOOR_Y0, DOOR_Y1 = BACK + 0.06, WS_Y - 0.06
 def belt(y):
-    """height of the sill at y: the top of the door cards and the bottom of the side glass, rising toward the rear"""
     return 0.94 + 0.12 * (GLASS_Y - y) / 1.46
-HDR_Y = 0.80                         # windscreen top, the front edge of the headliner
-DOOR_X = 0.77                        # inner face of the door cards' upper band, beside the seats
+HDR_Y = 0.80
+DOOR_X = 0.77
 def inset(y):
-    """how far the sides draw in toward the front"""
     t = min(1.0, max(0.0, (y - 0.35) / 0.65)); return 0.16 * t * t * (3 - 2 * t)
-EYE = (0.0, 0.25, 1.15)              # what the windscreen's rim and the A-pillar bands turn their face toward: between the seats
+EYE = (0.0, 0.25, 1.15)
 
-# The A-pillar's centre line from the dash corner up to the roof, and the roof rail's above the side glass, front to
-# back: together the top line of the side glass.
 PILLAR = [(0.665, 1.44, 0.945), (0.685, 1.22, 1.085), (0.70, 0.99, 1.225), (0.695, 0.87, 1.30)]
 RAIL = [(0.695, 0.86, 1.31), (0.70, 0.45, 1.345), (0.70, 0.05, 1.335), (0.71, -0.17, 1.31), (0.72, BACK + 0.06, 1.275)]
-A_LINE = sorted((p[1], p[2]) for p in PILLAR)             # the A-pillar's height along y
+A_LINE = sorted((p[1], p[2]) for p in PILLAR)
 RAIL_Z = sorted((p[1], p[2]) for p in RAIL)
 A_X = sorted((p[1], p[0]) for p in PILLAR); RAIL_X = sorted((p[1], p[0]) for p in RAIL)
 
-# ---------- greenhouse: the A-pillars sweeping into the header rim, roof rails, headliner, side glass ----------
 def pillar_edges(y, half):
-    """the windscreen-side and glass-side edges of the A-pillar's band at y, the band facing the passengers"""
     c = Vector((interp(A_X, y), y, interp(A_LINE, y))); t = (Vector(PILLAR[0]) - Vector(PILLAR[-1])).normalized()
     nv = Vector(EYE) - c; nv = (nv - t * nv.dot(t)).normalized(); d = t.cross(nv)
     if d.x > 0: d = -d
     return tuple(c + d * half), tuple(c - d * half)
-# The windscreen's rim, right half, as its two edges: the opening's edge (inner) and the edge against the headliner
-# and the side glass (outer). Across the header, round the corner where the band fans out, down the A-pillar.
 RIM_IN = [(0.0, 0.806, 1.325), (0.22, 0.806, 1.325), (0.42, 0.812, 1.325), (0.52, 0.835, 1.326), (0.575, 0.88, 1.326), (0.618, 0.94, 1.32)]
 RIM_OUT = [(0.0, 0.79, 1.368), (0.22, 0.79, 1.368), (0.47, 0.785, 1.368), (0.62, 0.772, 1.362), (0.70, 0.765, 1.34), (0.74, 0.80, 1.285)]
 for y, half in ((0.97, 0.082), (1.10, 0.078), (1.27, 0.07)):
     e = pillar_edges(y, half); RIM_IN.append(e[0]); RIM_OUT.append(e[1])
-# The A-pillar's base: ahead of y 1.27 the band widens, its windscreen-side edge sweeping inward along the windscreen
-# base and its glass-side edge running down the side glass's front edge, both ending under the deck and the sill
 BASE_IN = [(0.640, 1.37, 1.05), (0.628, 1.435, 0.995), (0.605, 1.475, 0.963), (0.565, 1.49, 0.944), (0.52, 1.495, 0.905)]
 BASE_OUT = [(0.724, 1.30, 0.98), (0.735, 1.345, 0.955), (0.745, 1.368, 0.93), (0.750, 1.371, 0.91), (0.752, 1.373, 0.89)]
 RIM_IN += BASE_IN; RIM_OUT += BASE_OUT
 ribbon('frame', spline(mirror(RIM_IN), 8), spline(mirror(RIM_OUT), 8), 'lightGrey')
-# The roof rail's band above the side glass: its lower edge carries on from the pillar's glass-side edge, its upper
-# edge lies above the headliner. It starts inside the pillar's top.
 RAIL_LOW = [(0.72, 0.89, 1.255), (0.742, 0.83, 1.262), (0.735, 0.65, 1.292), (0.72, 0.45, 1.308), (0.72, 0.05, 1.298), (0.73, -0.17, 1.272), (0.74, BACK + 0.06, 1.237)]
 RAIL_UP = [(0.69, 0.89, 1.295), (0.70, 0.80, 1.335), (0.695, 0.65, 1.37), (0.684, 0.45, 1.388), (0.684, 0.05, 1.378), (0.694, -0.17, 1.352), (0.704, BACK + 0.06, 1.317)]
 for s in (-1, 1):
     ribbon(f'rail{s}', spline([(s * p[0], p[1], p[2]) for p in RAIL_UP], 6), spline([(s * p[0], p[1], p[2]) for p in RAIL_LOW], 6), 'lightGrey',
            thick=0.013, face=(0, 0.2, 1.0))
-    # B-pillar: a light grey band from the sill to the rail, leaning rearward, the door's rear end
     sweep(f'bpillar{s}', spline([(s * 0.785, BP_Y, belt(BP_Y) - 0.02), (s * 0.755, BP_Y - 0.05, 1.18), (s * 0.722, BP_Y - 0.11, 1.305)], 4),
           rrect(0.12, 0.035, 0.014), lambda p, t: Vector((-p.x, 0.3, 0)), 'lightGrey')
 def roof_top(y): return interp([(BACK - 0.03, 1.345), (-0.1, 1.372), (HDR_Y, 1.372)], y)
@@ -214,7 +183,6 @@ for j in range(19):
     rows.append([(edge_x * u, y, roof_top(y) - (roof_top(y) - edge_z) * abs(u) ** 3) for u in [i / 8 - 1 for i in range(17)]])
 grid('headliner', rows, 'headliner', 1, 0.02)
 def glass_top(y):
-    """height and inset of the side glass's top line at y: the A-pillar in front, the roof rail behind"""
     if y > 0.86: return interp(A_LINE, y), interp(A_X, y)
     return interp(RAIL_Z, y), interp(RAIL_X, y)
 for s in (-1, 1):
@@ -225,25 +193,17 @@ for s in (-1, 1):
         rows.append([(s * (xb + (xt - xb) * k / 4 + 0.012 * math.sin(math.pi * k / 4)), y, zb + (zt - zb) * k / 4) for k in range(5)])
     glass.append(grid(f'glass{s}', rows, 'glass', 0, 0, keep=False))
 
-# ---------- body: the long sloping hood, the front fenders and the cowl in front of the windscreen ----------
 box('cowl', (1.3, 0.07, 0.02), (0, WS_Y + 0.03, WS_Z + 0.005), 'darkGrey', 0.006)
-HOOD_Y, NOSE_Y = WS_Y + 0.07, WS_Y + 1.15      # the hood's rear edge on the centre line, and the nose
-FENDER_Y = GLASS_Y + 0.01                      # the fenders' rear edge, at the door's front cut
-# The top silhouette of the maker's side view (the fender's crown), read at 0, 0.35, 0.62, 0.80 and 0.97 m ahead of the
-# hood line and at the nose
+HOOD_Y, NOSE_Y = WS_Y + 0.07, WS_Y + 1.15
+FENDER_Y = GLASS_Y + 0.01
 SILHOUETTE = [(HOOD_Y, 0.912), (HOOD_Y + 0.35, 0.894), (HOOD_Y + 0.62, 0.823), (HOOD_Y + 0.80, 0.741), (HOOD_Y + 0.97, 0.629), (NOSE_Y, 0.57)]
 def hood_z(y):
-    """height of the hood on the centre line at y: the side view's silhouette at the cowl, 4.5 cm under it once clear of the cowl"""
     y = max(y, HOOD_Y); return smooth_interp(SILHOUETTE, y) - 0.045 * smooth01((y - HOOD_Y) / 0.35)
 def body_half(y):
-    """half the body's width at y, across the fenders' sides"""
     return interp([(FENDER_Y, 0.83), (1.6, 0.855), (1.9, 0.875), (2.2, 0.865), (2.45, 0.82), (2.6, 0.74), (NOSE_Y, 0.68)], y)
 def shoulder_z(y):
-    """height of the fender's crown at y: from under the sill at the door into the side view's line"""
     return smooth_interp([(FENDER_Y, belt(FENDER_Y) - 0.015)] + SILHOUETTE, y)
 def body_section(y, n_top=14, n_roll=8):
-    """the right half of the body's section at y, centre line outward: the hood rising into the fender's crown,
-    the crown rolling over a quarter ellipse, the side falling to below the sightline"""
     rx, rz = interp([(FENDER_Y, 0.09), (2.0, 0.12), (NOSE_Y, 0.16)], y), interp([(FENDER_Y, 0.12), (2.0, 0.17), (NOSE_Y, 0.2)], y)
     H = body_half(y); xs = H - rx; zc = hood_z(y); zs = shoulder_z(y); w = 0.12 / xs
     pts = []
@@ -256,10 +216,9 @@ def body_section(y, n_top=14, n_roll=8):
         pts.append((H - 0.012 * k / 2, zs - rz - (zs - rz - low) * k / 2))
     return pts
 def body_rear(x):
-    """where the body's rear edge lies at x: behind the cowl in the middle, back to the door's front cut at the sides"""
     return interp([(0.6, HOOD_Y), (0.665, WS_Y), (0.74, FENDER_Y + 0.03), (0.78, FENDER_Y)], x)
 n_cols = len(body_section(HOOD_Y)); rows = []
-x_rear = [p[0] for p in body_section(HOOD_Y)]      # the columns' x at the rear, which places the rear edge
+x_rear = [p[0] for p in body_section(HOOD_Y)]
 for j in range(25):
     t = j / 24; row = []
     for c in range(n_cols):
@@ -268,7 +227,6 @@ for j in range(25):
     rows.append(mirror(row))
 grid('body', rows, 'body', 1)
 
-# ---------- floor, partition and the footwell tub under the dash ----------
 TUB_Y0, TUB_Y1, TUB_X = 0.92, 1.30, 0.65
 box('floor', (1.6, WS_Y - 0.1 - BACK + 0.02, 0.03), (0, (WS_Y - 0.1 + BACK - 0.02) / 2, FLOOR), 'carpet', 0.005)
 box('partition', (1.58, 0.06, 1.0), (0, BACK, FLOOR + 0.5), 'darkGrey', 0.02)
@@ -277,18 +235,14 @@ for v in bm.verts:
     v.co = Vector((v.co.x * 2 * TUB_X, TUB_Y0 + (v.co.y + 0.5) * (TUB_Y1 - TUB_Y0), FLOOR + 0.02 + (v.co.z + 0.5) * (DASH_LOW + 0.015 - FLOOR - 0.02)))
 bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.z > 0.5 or f.normal.y < -0.5], context='FACES_ONLY')
 bm.edges.ensure_lookup_table()
-# round the recess as seen from the seats: the floor's front edge and the two front corners
 round_edges = [e for e in bm.edges if not e.is_boundary and all(v.co.y > TUB_Y1 - 0.01 for v in e.verts)]
 bmesh.ops.bevel(bm, geom=round_edges, offset=0.13, segments=7, profile=0.5, affect='EDGES', clamp_overlap=True)
-# an open shell: every face looks into the recess
 inside = Vector((0, (TUB_Y0 + TUB_Y1) / 2, (FLOOR + DASH_LOW) / 2))
 for f in bm.faces:
     if f.normal.dot(inside - f.calc_center_median()) < 0: f.normal_flip()
 finish(mesh_from('tub', bm), 'carpet', 0, 0)
 box('dashUnder', (2 * TUB_X, TUB_Y1 - DASH_Y - 0.06, 0.02), (0, (TUB_Y1 + DASH_Y + 0.06) / 2, DASH_LOW + 0.012), 'darkGrey', 0.004)
 
-# ---------- dashboard: a deep flat deck to the windscreen, and the thin layered slab across it ----------
-# in front of the door cards' front end the deck widens behind the A-pillar's base, under the cowl's ends
 DECK_X = 0.72
 DECK_RISE, DECK_RUN, DECK_THICK = 0.03, WS_Y - DASH_Y - 0.05, 0.02
 def deck_z(y): return DASH_Z - 0.003 + DECK_RISE * (y - DASH_Y - 0.05) / DECK_RUN
@@ -297,21 +251,16 @@ for y in [DASH_Y + 0.05 + DECK_RUN * j / 8 for j in range(8)] + [DOOR_Y1 + 0.006
     half = DECK_X if y > DOOR_Y1 + 0.003 else DOOR_X - inset(y) - 0.005
     rows.append([(half * (i / 6 - 1), y, deck_z(y)) for i in range(13)])
 grid('dashDeck', rows, 'dash', 0, DECK_THICK)
-# the slab: its layered profile swept straight across at full height, the vent slot closing in a round end before
-# each end of the slab, and each end closed by a cap whose rim rounds over with radius SLAB_R
-SLAB_X, SLAB_R = 0.606, 0.025              # the slab's end, against the door card, and the radius of the cap's rim
-SLOT_X, SLOT_L = SLAB_X - 0.04, 0.012      # where the slot's round end finishes, and its length
+SLAB_X, SLAB_R = 0.606, 0.025
+SLOT_X, SLOT_L = SLAB_X - 0.04, 0.012
 LOW = DASH_LOW - DASH_Z
-# profile as (u: depth away from the passengers, z: height below the dash top); points 11-14 are the vent slot's
 SLAB_PROF = [(0.0, -0.012), (0.004, -0.003), (0.014, 0.0), (0.1, 0.0), (0.1, LOW), (0.05, LOW), (0.042, LOW + 0.005), (0.04, -0.128),
              (0.016, -0.124), (0.012, -0.118), (0.012, -0.09), (0.016, -0.086), (0.042, -0.086), (0.042, -0.068), (0.006, -0.068), (0.0, -0.062)]
 NP = len(SLAB_PROF)
-SLAB_LOWER = range(3, 11)                  # the sides below the slot, in the lower layer's material
-SLOT = (11, 12, 13, 14)                    # the slot's points, from its lower front edge round to its upper one
-ABOVE, BELOW = 15, 10                      # the front face's points next to the slot, above and below it
+SLAB_LOWER = range(3, 11)
+SLOT = (11, 12, 13, 14)
+ABOVE, BELOW = 15, 10
 def slab_prof(closed):
-    """the profile with the slot closed by the fraction closed: its four points move to the front face's line at the
-    slot's middle height, so the slot's end is round in front view and in plan"""
     out = list(SLAB_PROF); (ua, za), (ub, zb) = SLAB_PROF[ABOVE], SLAB_PROF[BELOW]
     mid = (SLAB_PROF[SLOT[0]][1] + SLAB_PROF[SLOT[-1]][1]) / 2
     for n, i in enumerate(SLOT):
@@ -319,7 +268,6 @@ def slab_prof(closed):
         out[i] = tuple(a + (b - a) * closed for a, b in zip(SLAB_PROF[i], f))
     return out
 def dense(prof, step=0.004):
-    """the profile's sides cut into pieces no longer than step, each point with the side it starts"""
     out = []
     for k, p in enumerate(prof):
         q = prof[(k + 1) % len(prof)]; n = max(1, math.ceil(math.dist(p, q) / step))
@@ -336,17 +284,16 @@ def inside_poly(p, poly):
 def build_slab():
     bm = bmesh.new(); dropped = 0
     full = dense(slab_prof(1.0)); m = len(full)
-    stations = [(0.0, 0.0)]                # (x, how far the slot is closed), right half
-    for i in range(9):     # the slot's end: half an ellipse, SLOT_L long
+    stations = [(0.0, 0.0)]
+    for i in range(9):
         a = math.radians(90 * i / 8); stations.append((SLOT_X - SLOT_L * (1 - math.sin(a)), 1 - math.cos(a)))
     stations.append((SLAB_X - SLAB_R, 1.0))
     stations = [(-x, c) for x, c in reversed(stations[1:])] + stations
     rings = []
     for x, c in stations:
-        # the slot's points follow the slot; the dense points along the other sides stay put
         prof = slab_prof(c); pts = []
         for (u, z), k in full:
-            if k in (BELOW, *SLOT):        # sides touching the slot: carried with their end points
+            if k in (BELOW, *SLOT):
                 fa, fb = slab_prof(1.0)[k], slab_prof(1.0)[(k + 1) % NP]
                 L = math.dist(fa, fb); t = math.dist(fa, (u, z)) / L if L else 0.0
                 pa, pb = prof[k], prof[(k + 1) % NP]; u, z = pa[0] + (pb[0] - pa[0]) * t, pa[1] + (pb[1] - pa[1]) * t
@@ -355,11 +302,9 @@ def build_slab():
     for r0, r1 in zip(rings, rings[1:]):
         for j in range(m):
             f = bm.faces.new((r0[j], r0[(j + 1) % m], r1[(j + 1) % m], r1[j])); f.material_index = int(full[j][1] in SLAB_LOWER)
-    # the end caps: a height field over the profile, rising from the outline along a quarter circle of radius SLAB_R
     poly = [p for p, _ in full]; sides = slab_prof(1.0)
     if sum(a[0] * b[1] - b[0] * a[1] for a, b in zip(poly, poly[1:] + poly[:1])) < 0: order = list(range(m))[::-1]
     else: order = list(range(m))
-    # points in rows along the outline at the heights of the quarter circle, then an even grid where it is flat
     edges = list(zip(poly, poly[1:] + poly[:1]))
     def dist(p): return min(seg_dist(p, a, b) for a, b in edges)
     inner = []
@@ -402,98 +347,79 @@ def build_slab():
     print(f'MEASURE dash end caps: {dropped} faces left out of the triangulation')
     return o
 build_slab()
-VENT_PATH = [(x, DASH_Y, 0.0) for x in (-(SLOT_X - SLOT_L - 0.002), SLOT_X - SLOT_L - 0.002)]   # the slot's light strip and vent box
+VENT_PATH = [(x, DASH_Y, 0.0) for x in (-(SLOT_X - SLOT_L - 0.002), SLOT_X - SLOT_L - 0.002)]
 def outward(p, t):
-    """horizontal, away from the passengers: the side of the path the slab body lies on"""
     n = Vector((t.y, -t.x, 0)); return n if n.dot(Vector((p.x, 1.0 - p.y + 0.4, 0))) > 0 else -n
 def slab(name, prof, material, path):
-    # across the middle the profile's first axis runs down (tangent +x, normal toward the passengers)
     sweep(name, [(p[0], p[1], DASH_Z + p[2]) for p in path], [(-z, -u) for u, z in prof], lambda p, t: -outward(p, t), material)
 slab('dashVent', [(0.034, -0.0845), (0.046, -0.0845), (0.046, -0.0695), (0.034, -0.0695)], 'piano', VENT_PATH)
 slab('dashStrip', [(0.029, -0.08), (0.034, -0.08), (0.034, -0.074), (0.029, -0.074)], 'strip', VENT_PATH)
 
-# ---------- doors: a dark frame round a large light panel, a wedge armrest block on the panel with the release button ----------
 M['frame'] = mat('frame', '#4b4a48', 0.8); M['insert'] = mat('insert', '#7a736a', 0.85); M['block'] = mat('block', '#847e75', 0.6)
 M['blockTop'] = mat('blockTop', '#9a9a95', 0.35)
-PAN_REAR, PAN_FRONT, PAN_R = -0.10, 0.95, 0.12            # the panel's y extent at armrest height and its corner radius
-BLK_REAR, BLK_FRONT = -0.07, 0.80                          # the block's y extent
-PAN_STEP, BLK_RISE = 0.018, 0.035                          # the width of the panel's step and of the block's rise
-PAN_DEPTH = 0.022                                          # how far the panel sits behind the frame
-BLK_TOP_RISE = 0.012                                       # the width of the block's rise along its top edge
-LEAN = 0.3                                                 # how far the panel's ends lean rearward per metre of height
-SHOULDER_Y, SHOULDER_D = 0.945, 0.045                      # the shoulder's rear face beside the dash end, and how far it stands in
+PAN_REAR, PAN_FRONT, PAN_R = -0.10, 0.95, 0.12
+BLK_REAR, BLK_FRONT = -0.07, 0.80
+PAN_STEP, BLK_RISE = 0.018, 0.035
+PAN_DEPTH = 0.022
+BLK_TOP_RISE = 0.012
+LEAN = 0.3
+SHOULDER_Y, SHOULDER_D = 0.945, 0.045
 BAR_REAR, BAR_FRONT = 0.07, BLK_FRONT - 0.08
 def door_base(y, z):
-    """the card's plain section at y: how far out its face stands at height z"""
     b = belt(y)
     return interp([(FLOOR, 0.79), (FLOOR + 0.05, 0.752), (FLOOR + 0.12, 0.746), (b - 0.10, 0.764), (b - 0.035, DOOR_X), (b, 0.79)], z)
 def rbox(y, z, y0, y1, z0, z1, r):
-    """signed distance to a rounded rectangle, negative inside"""
     r = min(r, (z1 - z0) / 2, (y1 - y0) / 2)
     qy = max(y0 + r - y, y - (y1 - r), 0.0); qz = max(z0 + r - z, z - (z1 - r), 0.0)
     inside = min(max(y0 + r - y, y - (y1 - r), z0 + r - z, z - (z1 - r)), 0.0)
     return math.hypot(qy, qz) - r + inside
 def pan_edges(y):
-    """the panel's lower and upper edge at y: the lower rises toward the front, the upper rises toward the rear under
-    the sill and sweeps down into the lower at the front"""
     t = min(1.0, max(0.0, (y - PAN_REAR) / (PAN_FRONT - PAN_REAR)))
     return 0.42 + 0.15 * t, 0.80 + (belt(PAN_REAR) - 0.06 - 0.80) * (1 - t ** 1.8)
 def blk_edges(y):
-    """the block's lower and upper edge at y: tall at the rear, the lower edge rising toward a low round nose at the
-    front, the upper rising toward the rear"""
     t = min(1.0, max(0.0, (y - BLK_REAR) / (BLK_FRONT - BLK_REAR)))
     return 0.47 + 0.12 * t ** 1.2, 0.80 - 0.09 * t
 def pan_sdf(y, z):
     z0, z1 = pan_edges(y); return rbox(y + LEAN * (z - 0.6), z, PAN_REAR, PAN_FRONT, z0, z1, PAN_R)
 def blk_sdf(y, z):
     z0, z1 = blk_edges(y); yl = y + LEAN * (z - 0.6)
-    d = rbox(yl, z, BLK_REAR, BLK_FRONT + 1.0, z0, z1, 0.03)      # the rear end: small corners
-    if y > (BLK_FRONT - (z1 - z0) / 2): d = max(d, rbox(y, z, BLK_REAR - 1.0, BLK_FRONT, z0, z1, (z1 - z0) / 2))   # the nose
+    d = rbox(yl, z, BLK_REAR, BLK_FRONT + 1.0, z0, z1, 0.03)
+    if y > (BLK_FRONT - (z1 - z0) / 2): d = max(d, rbox(y, z, BLK_REAR - 1.0, BLK_FRONT, z0, z1, (z1 - z0) / 2))
     return d
 def blk_rise(y, z):
-    """the width of the block's rise at (y, z): wide below, narrow along the top edge"""
     z0, z1 = blk_edges(y); return BLK_RISE + (BLK_TOP_RISE - BLK_RISE) * smooth01(((z - z0) / (z1 - z0) - 0.35) / 0.3)
 def blk_depth(y, z):
-    """how far the block stands out of the panel at (y, z): most along its top, its face sloping back below it"""
     z0, z1 = blk_edges(y); return 0.04 + 0.035 * smooth01((z - z0) / (z1 - z0))
 def blk_crest(y, z): return blk_sdf(y, z) + blk_rise(y, z)
 def band_sdf(y, z):
-    """the bright band along the block's top edge, negative inside: the rise of its upper half"""
     z0, z1 = blk_edges(y); return max(blk_sdf(y, z), -blk_crest(y, z), (z0 + z1) / 2 - z)
 def slot_sdf(y, z):
-    """the finger slot along the block's top, negative inside"""
     top = blk_edges(y)[1]; return max(top - z, z - (top + 0.02), BLK_REAR + 0.12 - y, y - (BLK_FRONT - 0.05))
 def shoulder(y, z):
-    """how much of the shoulder stands at (y, z), 0 to 1: the door's upper front beside the dash, from under the slab
-    up to the sill, its rear face and edges rounded"""
     return smooth01((y - SHOULDER_Y + 0.015) / 0.03) * smooth01((z - (DASH_LOW - 0.065)) / 0.05) * smooth01((belt(y) - 0.005 - z) / 0.045)
 def slot_edge(y, z): return slot_sdf(y, z) + 0.006
 def pan_crest(y, z): return pan_sdf(y, z) + PAN_STEP
 def card_x(y, z):
     x = door_base(y, z) - inset(y)
-    x += PAN_DEPTH * smooth01(-pan_sdf(y, z) / PAN_STEP)           # the panel sits a step behind the frame
+    x += PAN_DEPTH * smooth01(-pan_sdf(y, z) / PAN_STEP)
     t = min(1.0, max(0.0, -blk_sdf(y, z) / blk_rise(y, z)))
-    x -= blk_depth(y, z) * (1 - (1 - t) ** 2)                      # the block stands out, its edge rounding over
+    x -= blk_depth(y, z) * (1 - (1 - t) ** 2)
     ds = slot_sdf(y, z)
-    if ds < 0: x += 0.012 * smooth01(-ds / 0.006)                  # the finger slot
-    x -= SHOULDER_D * shoulder(y, z)                               # the shoulder at the door's upper front
+    if ds < 0: x += 0.012 * smooth01(-ds / 0.006)
+    x -= SHOULDER_D * shoulder(y, z)
     return x
 def material_at(y, z):
     if band_sdf(y, z) < 0: return 3
     if blk_sdf(y, z) < 0: return 2
     return 0 if pan_sdf(y, z) < 0 else 1
-# The card is a height field x(y, z) on an even grid from the floor to the sill. Grid points next to the panel's or
-# the block's outline are moved onto it, so the colours meet along the outline and not along grid steps.
 NY, NZ = 320, 320
 def blk_mid(y, z): return blk_sdf(y, z) + 0.5 * blk_rise(y, z)
 def onto_outline(y, z, cy, cz):
-    """(y, z) moved onto the foot or the crest of the block's rise (and the middle of it), of the panel's step or of
-    the finger slot's walls, where one lies within half a grid cell, and whether that is a colour boundary"""
     for f, boundary in ((blk_sdf, True), (pan_sdf, True), (blk_crest, True), (blk_mid, False), (pan_crest, False), (slot_sdf, False), (slot_edge, False)):
         d = f(y, z)
         gy = (f(y + 1e-4, z) - f(y - 1e-4, z)) / 2e-4; gz = (f(y, z + 1e-4) - f(y, z - 1e-4)) / 2e-4; g = gy * gy + gz * gz
         if g < 0.25: continue
-        if abs(d) < 0.5 * (abs(gy) * cy + abs(gz) * cz):    # half a cell measured across the outline, in the units of f
+        if abs(d) < 0.5 * (abs(gy) * cy + abs(gz) * cz):
             return y - d * gy / g, z - d * gz / g, boundary
     return y, z, False
 CARD = []
@@ -507,22 +433,19 @@ for s in (-1, 1):
     for col in CARD:
         row = [bm.verts.new((s * (0.835 - inset(col[0][0])), *col[0][:2]))]
         row += [bm.verts.new((s * card_x(y, z), y, z)) for y, z, _ in col[1:-1]]
-        row += [bm.verts.new((s * (0.835 - 0.4 * inset(col[-1][0])), *col[-1][:2]))]    # the sill shelf draws in less than the card
+        row += [bm.verts.new((s * (0.835 - 0.4 * inset(col[-1][0])), *col[-1][:2]))]
         V.append(row)
     for i in range(NY):
         for k in range(NZ):
             q = [(i, k), (i, k + 1), (i + 1, k + 1), (i + 1, k)]
-            # two triangles, split along the diagonal that lies on an outline where one does
             if CARD[i][k + 1][2] and CARD[i + 1][k][2] and not (CARD[i][k][2] and CARD[i + 1][k + 1][2]): q = q[1:] + q[:1]
             for tri in ((q[0], q[1], q[2]), (q[0], q[2], q[3])):
                 c = [sum(CARD[a][b][j] for a, b in tri) / 3 for j in (0, 1)]
                 f = bm.faces.new([V[a][b] for a, b in (tri if s > 0 else tri[::-1])]); f.material_index = material_at(*c)
     o = finish(mesh_from(f'door{s}', bm), 'insert', 0, 0)
     for n in ('frame', 'block', 'blockTop'): o.data.materials.append(M[n])
-    # the even grid is far denser than the flat stretches need: faces within half a degree of each other are merged
     md = o.modifiers.new('dc', 'DECIMATE'); md.decimate_type = 'DISSOLVE'; md.angle_limit = math.radians(0.5); md.delimit = {'MATERIAL'}
     o.modifiers.new('tr', 'TRIANGULATE')
-    # the merged mesh; each vertex's normal is the height field's slope at it
     me = bpy.data.meshes.new_from_object(o.evaluated_get(bpy.context.evaluated_depsgraph_get())); o.modifiers.clear(); o.data = me
     if 'sharp_edge' in me.attributes: me.attributes.remove(me.attributes['sharp_edge'])
     me.validate(); me.update()
@@ -560,7 +483,6 @@ box('deckGrille', (2 * (DOOR_X - inset(DOOR_Y1) - 0.03), DECK_GRILLE_Y[1] - DECK
     (0, sum(DECK_GRILLE_Y) / 2, deck_z(sum(DECK_GRILLE_Y) / 2) + DECK_THICK / 2 + 0.0005), 'grille', 0.0015,
     rot=Matrix.Rotation(math.atan2(DECK_RISE, DECK_RUN), 4, 'X').to_quaternion())
 
-# ---------- headliner front: two sun visors, the overhead console with the dome lights and stop button, the camera pod ----------
 for s in (-1, 1): box(f'visor{s}', (0.42, 0.17, 0.03), (s * 0.30, 0.69, 1.345), 'lightGrey', 0.012, 1, Matrix.Rotation(math.radians(18), 4, 'X').to_quaternion())
 box('overhead', (0.16, 0.25, 0.04), (0, 0.67, 1.352), 'lightGrey', 0.012, 1)
 for s in (-1, 1): box(f'dome{s}', (0.045, 0.06, 0.008), (s * 0.04, 0.6, 1.331), 'dome', 0.004)
@@ -574,10 +496,7 @@ bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
 finish(mesh_from('cameraPod', bm), 'darkGrey', 0.012)
 cylinder('cameraLens', 0.012, 0.006, (0, 0.676, 1.27), 'piano').rotation_euler = (math.radians(90), 0, 0)
 
-# ---------- seats: horizontally segmented cushions, a floating centre armrest, cup holders and window switches ----------
-SEAT_Z, SEAT_Y = 0.42, 0.45       # cushion top; how far the seats stand ahead of the script's seat coordinates
-# each seat's back blocks, headrest and headrest posts, by the name of the mesh they are exported as: baked with the
-# Cabin, then split off it
+SEAT_Z, SEAT_Y = 0.42, 0.45
 SEAT_BACK_PARTS = {}
 def seat(x):
     for i, (y, d, h) in enumerate([(0.135, 0.17, 0.13), (-0.04, 0.17, 0.12), (-0.21, 0.165, 0.12)]):
@@ -596,11 +515,9 @@ for y in (-0.06, -0.11): box(f'winSwitch{y}', (0.05, 0.035, 0.012), (0, SEAT_Y +
 box('armrest', (0.16, 0.42, 0.07), (0, SEAT_Y - 0.2, SEAT_Z + 0.17), 'leather', 0.03, 2)
 box('armPost', (0.05, 0.08, 0.16), (0, SEAT_Y - 0.38, SEAT_Z + 0.07), 'darkGrey', 0.012)
 
-# ---------- the screen: ~21 in, 4:3, hung in front of the dash and reaching below it; kept out of the bake ----------
 SW, SH = 0.43, 0.32; SCY, SCZ = DASH_Y - 0.03, 0.84
 box('screenMount', (0.09, 0.03, 0.06), (0, DASH_Y - 0.008, DASH_Z - 0.09), 'darkGrey', 0.01)
 box('screenBezel', (SW + 0.014, 0.018, SH + 0.014), (0, SCY + 0.011, SCZ), 'piano', 0.005)
-# under the screen: a USB-C port at each end, the two window buttons between them
 box('underScreen', (0.12, 0.024, 0.018), (0, SCY + 0.012, SCZ - SH / 2 - 0.016), 'darkGrey', 0.005)
 for name, x, w, h in (('usbC0', -0.04, 0.014, 0.006), ('windowButton0', -0.013, 0.016, 0.009), ('windowButton1', 0.013, 0.016, 0.009), ('usbC1', 0.04, 0.014, 0.006)):
     box(name, (w, 0.004, h), (x, SCY - 0.0005, SCZ - SH / 2 - 0.016), 'piano', 0.0015)
@@ -609,37 +526,30 @@ bpy.ops.mesh.primitive_plane_add(size=1, location=(0, SCY, SCZ), rotation=(math.
 scr = bpy.context.object; scr.name = 'Screen'; scr.scale = (SW, SH, 1); scr.data.materials.append(M['screen'])
 scr.select_set(False)
 
-# ---------- cameras: the page's home seat and the orbit's azimuth limits, the reference's front view, a view from the
-# open left door, the right A-pillar's top corner, the right door from the left seat and from across the car, the left
-# end of the dash, the hood and fenders from outside ----------
 def camera(name, loc, target, fov, fit='AUTO'):
     c = bpy.data.objects.new(name, bpy.data.cameras.new(name)); sc.collection.objects.link(c)
     c.data.lens_unit = 'FOV'; c.data.sensor_fit = fit; c.data.angle = math.radians(fov); c.location = loc; c.data.clip_start = 0.02
     c.rotation_euler = (Vector(target) - Vector(loc)).to_track_quat('-Z', 'Y').to_euler(); return c
-# the page's opening view: orbit radius 0.995 m round a centre 0.21 m above the screen centre (ORBIT_LIFT) at azimuth
-# -0.3881, polar 1.4802, 60 deg tall
 ORBIT_C = (0, SCY, SCZ + 0.21)
 HOME = camera('home', (-0.375, 0.0278, 1.14), ORBIT_C, 60, 'VERTICAL')
 FRONT = camera('front', (0.0, -0.3, 1.15), (0.0, 1.2, 0.86), 76)
 DOOR = camera('door', (-1.15, -0.1, 1.08), (0.25, 0.95, 0.62), 70)
 CORNER = camera('corner', (-0.2, 0.2, 1.12), (0.62, 0.95, 1.30), 50)
-RDOOR = camera('rdoor', (-0.38, 0.25, 1.12), (0.78, 0.42, 0.72), 82)      # the right door seen from the left seat
-SIDE = camera('side', (-8.0, 0.55, 0.8), (0.0, 0.55, 0.8), 16)            # the right door from across the car, nearly flat
+RDOOR = camera('rdoor', (-0.38, 0.25, 1.12), (0.78, 0.42, 0.72), 82)
+SIDE = camera('side', (-8.0, 0.55, 0.8), (0.0, 0.55, 0.8), 16)
 DASHEND = camera('dashend', (-0.3, 0.45, 1.05), (-0.62, 1.05, 0.86), 50)
-# the orbit's azimuth limits, -0.6347 and 0.6347, at the opening view's polar angle
 LEFT = camera('left', (-0.5876, 0.1471, 1.14), ORBIT_C, 60, 'VERTICAL')
 RIGHT = camera('right', (0.5876, 0.1471, 1.14), ORBIT_C, 60, 'VERTICAL')
-OUTSIDE = camera('outside', (-3.0, 5.4, 1.7), (0.1, 1.5, 0.75), 34)      # the front three-quarter view of the maker's exterior image
+OUTSIDE = camera('outside', (-3.0, 5.4, 1.7), (0.1, 1.5, 0.75), 34)
 SHOTS = [(HOME, 1470, 729), (LEFT, 1470, 729), (RIGHT, 1470, 729), (FRONT, 1280, 960), (DOOR, 1280, 720), (CORNER, 1280, 960),
          (RDOOR, 1280, 720), (SIDE, 1600, 800), (DASHEND, 1280, 720), (OUTSIDE, 1280, 960)]
 LEFT_SIDE = ('door-1', 'release-1', 'glass-1', 'rail-1', 'bpillar-1', 'grille-1', 'doorBar-1')
-SEAT_BACKS = ('back-', 'back0', 'head-', 'head0', 'post', 'partition')   # left out of the front view
-SEATS = ('cush', 'back', 'head', 'post', 'base', 'console', 'armrest', 'armPost', 'cup', 'winSwitch')   # left out of the side view
+SEAT_BACKS = ('back-', 'back0', 'head-', 'head0', 'post', 'partition')
+SEATS = ('cush', 'back', 'head', 'post', 'base', 'console', 'armrest', 'armPost', 'cup', 'winSwitch')
 PAGE_VIEWS = (HOME, LEFT, RIGHT)
-SEAT_BACK_NEAR = 0.12  # the page's SEAT_BACK_NEAR: a seat back is hidden while the eye is nearer than this to its box
+SEAT_BACK_NEAR = 0.12
 
 def hidden_seat_backs(c):
-    """the parts of the seat backs the page hides with its eye at camera c"""
     dg = bpy.context.evaluated_depsgraph_get(); hidden = set()
     for parts in SEAT_BACK_PARTS.values():
         P = [o.matrix_world @ v.co for o in parts for v in o.evaluated_get(dg).data.vertices]
@@ -650,7 +560,6 @@ def hidden_seat_backs(c):
 def shoot(prefix):
     for c, w, h in SHOTS:
         near = hidden_seat_backs(c) if c in PAGE_VIEWS else set()
-        # the photos are taken through the open left door: hide that door for the door view
         for o in bpy.data.objects:
             if o.name in LEFT_SIDE: o.hide_render = c in (DOOR, SIDE)
             if o.name.startswith(SEATS): o.hide_render = (c is SIDE)
@@ -661,21 +570,18 @@ def shoot(prefix):
         t = time.time(); bpy.ops.render.render(write_still=True); print(f'TIME {prefix}_{c.name}_s {time.time() - t:.2f}')
     for o in bpy.data.objects: o.hide_render = False
 
-EYE_BOX = ((-0.61, -0.07, 0.82), (0.61, 0.6, 1.26))   # the page's EYE_BOUNDS, in these axes
+EYE_BOX = ((-0.61, -0.07, 0.82), (0.61, 0.6, 1.26))
 def measure():
-    """the proportions the map note compares with the maker's side view, and what stands inside the page's eye box,
-    read from the built meshes"""
     dg = bpy.context.evaluated_depsgraph_get()
     def pts(name): o = bpy.data.objects[name]; return [o.matrix_world @ v.co for v in o.evaluated_get(dg).data.vertices]
     def top_at(name, y):
-        """the highest point of the mesh's section at y"""
         o = bpy.data.objects[name]; me = o.evaluated_get(dg).data; best = -1.0
         for e in me.edges:
             p, q = (o.matrix_world @ me.vertices[i].co for i in e.vertices)
             if (p.y - y) * (q.y - y) <= 0 and p.y != q.y: best = max(best, p.z + (q.z - p.z) * (y - p.y) / (q.y - p.y))
         return best
     ws = max(p.y for p in pts('dashDeck')); front = max(p.y for p in pts('glass1'))
-    feet = [p.y for p in pts('bpillar1')[:16]]; bp_front, bp_rear = max(feet), min(feet)     # the band's first section, on the sill
+    feet = [p.y for p in pts('bpillar1')[:16]]; bp_front, bp_rear = max(feet), min(feet)
     print(f'MEASURE windscreen base y {ws:.3f}, B-pillar foot y {bp_rear:.3f} to {bp_front:.3f}: {ws - bp_front:.3f} to {ws - bp_rear:.3f} m')
     print(f'MEASURE door at the sill, side glass front corner y {front:.3f} to the B-pillar foot rear edge: {front - bp_rear:.3f} m')
     print(f'MEASURE sill height {top_at("door1", front - 0.001):.3f} m at the door front, {top_at("door1", bp_rear):.3f} m at its rear')
@@ -686,9 +592,8 @@ def measure():
     backs = {o.name for parts in SEAT_BACK_PARTS.values() for o in parts}
     print('MEASURE inside the eye box:', sorted(inside - backs) or 'nothing', '| seat backs, hidden near the eye:', sorted(inside & backs) or 'none')
 
-# ---------- the lightmap's UVs: the joined Cabin unwrapped, each island sized by how near the page's eye sees it ----------
-ORBIT_MARGIN = 0.02                                   # the page's ORBIT_MARGIN
-ORBIT_R = ORBIT_C[1] - EYE_BOX[0][1] - ORBIT_MARGIN   # the page's fitOrbit round ORBIT_C in EYE_BOX: radius, polar and azimuth limits
+ORBIT_MARGIN = 0.02
+ORBIT_R = ORBIT_C[1] - EYE_BOX[0][1] - ORBIT_MARGIN
 POLAR = [math.acos((EYE_BOX[i][2] - m - ORBIT_C[2]) / ORBIT_R) for i, m in ((1, ORBIT_MARGIN), (0, -ORBIT_MARGIN))]
 AZIMUTH = math.asin((EYE_BOX[1][0] - ORBIT_MARGIN) / ORBIT_R)
 FOV, MIN_FOV_ACROSS = 60, 40
@@ -700,11 +605,10 @@ RAY_STEP = math.radians(0.5)
 SWAY = (0.004, 0.004)
 MARGIN = 6
 PACK_MARGIN = MARGIN / SIZE
-UNSEEN, NEAR, FAR = 0.125, 0.3, 0.9   # an unseen piece's scale; a seen piece's is sqrt(FAR / its distance), the distance held between NEAR and FAR
-UNSEEN_MARGIN = 0.0005              # round each unseen piece, as a fraction of their block
-KEEP = 0.03                         # an unseen face this near a seen one of its island is sized with it
+UNSEEN, NEAR, FAR = 0.125, 0.3, 0.9
+UNSEEN_MARGIN = 0.0005
+KEEP = 0.03
 def page_eyes(n_az=29, n_polar=15):
-    """(eye, what it looks at) over the page's orbit, and along the zoom to the screen from its corners and the opening view"""
     out = []; centre = Vector(ORBIT_C); screen = Vector((0, SCY, SCZ))
     sways = [Vector((sx * SWAY[0], 0, sz * SWAY[1])) for sx in (-1, 1) for sz in (-1, 1)]
     def eye(az, polar): return centre + ORBIT_R * Vector((math.sin(polar) * math.sin(az), -math.sin(polar) * math.cos(az), math.cos(polar)))
@@ -730,11 +634,9 @@ def view_rays():
 def in_view(across, up, along):
     return along > 0 and ((across <= REACH[0] * along and up <= VIEW_TAN[1] * along) or (across <= VIEW_TAN[0] * along and up <= REACH[1] * along))
 def seen_from_page(cabin):
-    """for each face of the joined Cabin, the distance from the nearest of the page's eyes that sees it, or None: rays
-    over each eye's view, the Cabin Screen in the way, the side glass not, a seat back not while the page hides it"""
     from mathutils.bvhtree import BVHTree
     me = cabin.data; W = cabin.matrix_world; co = [W @ v.co for v in me.vertices]; polys = [tuple(p.vertices) for p in me.polygons]
-    back_of = {}                                        # face -> the seat back it belongs to
+    back_of = {}
     for name in SEAT_BACK_PARTS:
         g = cabin.vertex_groups[name].index; inside = {v.index for v in me.vertices if any(e.group == g for e in v.groups)}
         back_of.update({i: name for i, p in enumerate(polys) if all(v in inside for v in p)})
@@ -757,8 +659,6 @@ def seen_from_page(cabin):
         for ta, tb in rays:
             _, _, i, d = bvh.ray_cast(eye, f + r * ta + u * tb)
             if i is not None and i < len(keep) and (dist[keep[i]] is None or d < dist[keep[i]]): dist[keep[i]] = d
-        # faces too small for that grid: a ray at the middle of each face the first eye's rays missed (of every face,
-        # from the first eye)
         slot = {i: k for k, i in enumerate(keep)}
         for i in range(len(polys)) if missed is None else missed:
             if i not in slot: continue
@@ -770,12 +670,9 @@ def seen_from_page(cabin):
     return dist
 PART_NAMES = []
 def unwrap():
-    """the static parts joined into the Cabin with its lightmap UV set; returns the Cabin and each face's distance from
-    the nearest page eye that sees it (None where none does)"""
     import numpy as np
     from bpy_extras.mesh_utils import mesh_linked_uv_islands
     from mathutils.kdtree import KDTree
-    # each seat back's vertices carry a vertex group of its mesh's name; each face the number of the part it came from
     for name, parts in SEAT_BACK_PARTS.items():
         for o in parts: o.vertex_groups.new(name=name).add(range(len(o.data.vertices)), 1.0, 'REPLACE')
     bpy.ops.object.select_all(action='DESELECT')
@@ -787,7 +684,7 @@ def unwrap():
         a = o.data.attributes.new('part', 'INT', 'FACE'); a.data.foreach_set('value', [k] * len(o.data.polygons))
     bpy.ops.object.join(); cabin = bpy.context.object; cabin.name = 'Cabin'; me = cabin.data
     while me.uv_layers: me.uv_layers.remove(me.uv_layers[0])
-    first = me.uv_layers.new(name='UVMap')     # TEXCOORD_0, unused and all zero; the lightmap is TEXCOORD_1
+    first = me.uv_layers.new(name='UVMap')
     first.data.foreach_set('uv', [0.0] * (2 * len(first.data)))
     uv = me.uv_layers.new(name='Lightmap'); me.uv_layers.active = uv
     bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
@@ -799,7 +696,6 @@ def unwrap():
     for p in me.polygons:
         for key in p.edge_keys: faces_of.setdefault(key, []).append(p.index)
     for island in mesh_linked_uv_islands(me):
-        # the island's faces within KEEP of a seen one count as seen, at that one's distance
         seen = [i for i in island if dist[i] is not None]
         if seen and len(seen) < len(island):
             kd = KDTree(len(seen))
@@ -809,7 +705,6 @@ def unwrap():
                 if dist[i] is None:
                     _, k, gap = kd.find(centre[i])
                     if gap < KEEP: dist[i] = dist[seen[k]]
-        # the island's seen and unseen stretches are islands of their own, each scaled about its middle
         left = set(island)
         while left:
             start = left.pop(); piece = [start]; kind = dist[start] is None
@@ -824,7 +719,6 @@ def unwrap():
     unseen = np.array([d is None for d in dist]); loop_face = np.repeat(np.arange(len(me.polygons)), [p.loop_total for p in me.polygons])
     hidden = unseen[loop_face]
     def pack(faces, margin):
-        """pack the islands of the faces in the mask into the unit square; returns the lightmap UVs after it"""
         uv = me.uv_layers['Lightmap']; uv.data.foreach_set('uv', uvs.ravel())
         me.polygons.foreach_set('select', faces); me.edges.foreach_set('select', np.zeros(len(me.edges), dtype=bool))
         me.vertices.foreach_set('select', np.zeros(len(me.vertices), dtype=bool))
@@ -836,12 +730,10 @@ def unwrap():
         out = np.empty(2 * len(me.loops), dtype=np.float32); me.uv_layers['Lightmap'].data.foreach_get('uv', out); out = out.reshape(-1, 2)
         if (np.abs(out - uvs)[~faces[loop_face]] > 1e-6).any(): sys.exit('the lightmap UVs: a pack moved faces it was not given')
         return out
-    # the unseen pieces packed close into a block of their own, which the seen pieces are then packed with as one
-    # island: a four-cornered unseen face stands in for the block and tells where the block landed
     packed = pack(unseen, UNSEEN_MARGIN); lo = packed[hidden].min(axis=0); size = packed[hidden].max(axis=0) - lo
     def girth(q): return sum(float(np.linalg.norm(q[list(p.loop_indices)] - np.roll(q[list(p.loop_indices)], 1, axis=0), axis=1).sum())
                              for p in me.polygons if unseen[p.index])
-    grow = girth(uvs) / girth(packed)               # the block in the pieces' own units
+    grow = girth(uvs) / girth(packed)
     block = (packed[hidden] - lo) * grow; size = size * grow
     proxy = next(p for p in me.polygons if unseen[p.index] and p.loop_total == 4); corners = list(proxy.loop_indices)
     uvs[corners] = [(0, 0), (size[0], 0), (size[0], size[1]), (0, size[1])]
@@ -855,7 +747,6 @@ def unwrap():
     me.polygons.foreach_set('select', np.ones(len(me.polygons), dtype=bool))
     return cabin, dist
 def measure_uv(cabin, dist):
-    """MEASURE lines: each part's share of the lightmap and its texel size, and what the page's eyes never see"""
     import numpy as np, re
     me = cabin.data; n = len(me.polygons); W = cabin.matrix_world
     uvs = np.empty(2 * len(me.uv_layers['Lightmap'].data), dtype=np.float64); me.uv_layers['Lightmap'].data.foreach_get('uv', uvs); uvs = uvs.reshape(-1, 2)
@@ -885,7 +776,7 @@ if MODE == 'wb':
     sc.display.shading.show_object_outline = False
     sc.view_settings.exposure = 1.6
     sc.world = bpy.data.worlds.new('wb'); sc.world.color = (0.75, 0.78, 0.82)
-    M['glass'].diffuse_color = (0.22, 0.23, 0.25, 1)    # the tinted glass over the sky, drawn opaque
+    M['glass'].diffuse_color = (0.22, 0.23, 0.25, 1)
     shoot('wb')
     measure()
     sys.exit(0)
@@ -894,7 +785,6 @@ if MODE == 'uv':
     measure_uv(*unwrap())
     sys.exit(0)
 
-# ---------- Cycles ----------
 sc.render.engine = 'CYCLES'
 prefs = bpy.context.preferences.addons['cycles'].preferences
 for kind in ('OPTIX', 'CUDA', 'METAL'):
@@ -915,13 +805,12 @@ road = finish(mesh_from('road', bm), 'road', keep=False, smooth=False)
 sc.cycles.samples = 64; sc.cycles.use_denoising = True
 shoot('day')
 
-# the side glass stays out of the bake
 for o in glass: o.hide_render = True
 cabin, _ = unwrap()
 
 def bake(tag):
     img = bpy.data.images.new(f'light_{tag}', SIZE, SIZE, float_buffer=True)
-    img.colorspace_settings.name = 'Non-Color'   # the HDR holds the baked light as is, linear
+    img.colorspace_settings.name = 'Non-Color'
     for m in cabin.data.materials:
         n = m.node_tree.nodes.new('ShaderNodeTexImage'); n.image = img; m.node_tree.nodes.active = n
         u = m.node_tree.nodes.new('ShaderNodeUVMap'); u.uv_map = 'Lightmap'; m.node_tree.links.new(u.outputs['UV'], n.inputs['Vector'])
@@ -950,7 +839,6 @@ foot.location = (0, DASH_Y + 0.03, DASH_LOW - 0.006); foot.rotation_euler = (mat
 bake('ambient')
 for k in ('strip', 'ambient'): emission(k, 0)
 
-# each seat's back split off the baked Cabin: a mesh of its own with the Cabin's lightmap UVs
 seat_backs = []
 for name in SEAT_BACK_PARTS:
     bpy.ops.object.select_all(action='DESELECT'); cabin.select_set(True); bpy.context.view_layer.objects.active = cabin

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   COOL,
   DECAY,
@@ -19,22 +19,11 @@ import type {
 } from '@/lib/open-source';
 import { cn } from '@/lib/utils';
 
-// The Dependency Map: every Package with a Dependency or Example Dependency in
-// either direction, as one free-form graph per Ecosystem, one tab each, with
-// the rest of that Ecosystem's Packages on a ring around it. Solid edge =
-// installed with it, dashed = used by its example app. Each graph renders
-// already at rest; dragging a node reheats it. Hovering a node lights
-// its direct neighbours; clicking it keeps them lit until it, or the empty
-// background, is clicked again. A node's name links to its registry page,
-// like a Package row's registry icon. See docs/adr/0010-dependency-map.md.
-
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
-// Pointer travel, in drawing units, past which a press is a drag, not a click.
 const CLICK_SLOP = 4;
 
 export function DependencyMap({ graph }: { graph: DependencyGraph }) {
-  // Tabs follow the order Ecosystems first appear in the curated list.
   const ecosystems = [...new Set(graph.packages.map((entry) => entry.ecosystem))];
   const [current, setCurrent] = useState<Ecosystem>(ecosystems[0]);
 
@@ -69,8 +58,6 @@ export function DependencyMap({ graph }: { graph: DependencyGraph }) {
         <Legend dashed>used by its example app</Legend>
       </div>
 
-      {/* Keyed by Ecosystem so each tab gets its own settled layout and its
-          own selection, rather than one graph morphing into another. */}
       <Graph key={current} packages={packages} links={links} unconnected={unconnected} />
 
       <p className="mt-4 text-sm text-muted-foreground">
@@ -91,14 +78,16 @@ function Graph({
   links: DependencyLink[];
   unconnected: Package[];
 }) {
-  const layoutLinks: LayoutLink[] = links.map((link) => ({
-    from: link.from,
-    to: link.to,
-    loose: link.kind === 'example',
-  }));
+  const layoutLinks: LayoutLink[] = useMemo(
+    () =>
+      links.map((link) => ({
+        from: link.from,
+        to: link.to,
+        loose: link.kind === 'example',
+      })),
+    [links],
+  );
 
-  // The ring is placed once, around where the graph settles, and stays put
-  // while nodes inside it are dragged.
   const [start] = useState(() => {
     const settled = settle(
       packages.map((entry) => entry.name),
@@ -120,7 +109,6 @@ function Graph({
   const svg = useRef<SVGSVGElement>(null);
   const press = useRef<{ id: string; x: number; y: number; dragged: boolean } | null>(null);
 
-  // Run frames until the layout cools again.
   const reheat = useCallback(() => {
     alpha.current = Math.max(alpha.current, 0.3);
     if (frame.current) return;
@@ -131,9 +119,7 @@ function Graph({
       frame.current = alpha.current > COOL ? requestAnimationFrame(loop) : 0;
     };
     frame.current = requestAnimationFrame(loop);
-    // layoutLinks is rebuilt each render from props that never change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [layoutLinks]);
 
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
 
@@ -169,12 +155,10 @@ function Graph({
     }
     setSelected((current) => (current === p.id ? null : p.id));
   };
-  // A press on the empty background clears the selection.
   const pressBackground = (e: React.PointerEvent) => {
     if (e.target === e.currentTarget) setSelected(null);
   };
 
-  // Hover previews; with nothing hovered, the selection holds.
   const active = hovered ?? selected;
   const byId = new Map(nodes.map((node) => [node.id, node]));
   const usedBy = (name: string) => links.filter((link) => link.to === name).length;
@@ -186,8 +170,6 @@ function Graph({
     : null;
 
   return (
-    // Wider than the text column: the graph needs the room. On a phone it
-    // keeps a readable size and scrolls sideways instead of shrinking.
     <div className="relative left-1/2 mt-6 w-[min(calc(100vw-2rem),64rem)] -translate-x-1/2 overflow-x-auto rounded-lg border border-border">
       <svg
         ref={svg}

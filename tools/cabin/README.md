@@ -36,8 +36,10 @@ parts, which the page hides while the eye is near them.
 ## 2. Look at how the lightmap is shared out
 
 ```sh
-$BLENDER -b --factory-startup --python tools/cabin/cabin.py -- uv
+$BLENDER -b --factory-startup --python tools/cabin/cabin.py -- uv [size]
 ```
+
+`size` is the lightmap's size in pixels, 2048 by default.
 
 Joins the Cabin and lays out its lightmap UVs as the bake does, without Cycles (about three and a half minutes on an M2), and prints `MEASURE`
 lines: how much of the map is covered, how much of the Cabin's area the page's eye never sees and what share of the map
@@ -65,13 +67,19 @@ named `Screen` and is not baked, and the side glass is a separate object named `
 with a see-through material. Each seat's back, headrest and headrest posts are baked as part of the Cabin and then split
 off it into `SeatBackLeft` and `SeatBackRight`, which keep the Cabin's lightmap UVs and read the same lightmaps.
 
+The kernel runs `cabin.py -- bake [size] [samples]` (2048 and 256 by default). The same command bakes on this machine,
+on the first of OptiX, CUDA or Metal that Blender finds, and writes the ten Cycles day renders, the three lightmaps and
+`cabin.glb` into `out/`.
+
 ## 4. Denoise
 
 ```sh
 $BLENDER -b --factory-startup --python tools/cabin/denoise.py
 ```
 
-Writes `out/light_day_dn.hdr`, `out/light_night_dn.hdr` and `out/light_ambient_dn.hdr`.
+Denoises the lightmaps with OIDN through Blender's compositor, on the CPU, without Cycles, and writes
+`out/light_day_dn.hdr`, `out/light_night_dn.hdr` and `out/light_ambient_dn.hdr`. Given `-- <in.hdr> <out.hdr> ...`, it
+denoises those pairs instead.
 
 ## 5. Make the surface textures
 
@@ -89,10 +97,11 @@ run needs the network. A few seconds; the tiles do not depend on the bake. Why t
 ## 6. Compress
 
 ```sh
-$BLENDER -b --factory-startup --python tools/cabin/compress.py
+$BLENDER -b --factory-startup --python tools/cabin/compress.py [-- <lightmap quality> [<texture quality>]]
 ```
 
-Replaces the files in `public/cabin/`:
+Reads `cabin.glb`, the three denoised lightmaps and the surface tiles from `out/`, and replaces the files in
+`public/cabin/`, removing each file's earlier version:
 
 - `cabin.<hash>.glb`: the scene with Draco mesh compression. The page needs three.js's `DRACOLoader`.
 - `light-day.<hash>.avif`, `light-night.<hash>.avif`, `light-ambient.<hash>.avif`: each lightmap's linear light divided by `scale`, with the sRGB
@@ -112,10 +121,11 @@ names from the manifest and never hard-codes them.
 ## 7. Check and commit
 
 ```sh
-python3 tools/cabin/verify.py
+python3 tools/cabin/verify.py [directory]
 ```
 
-Checks that every file in `public/cabin/` is the one the manifest names, that each name matches its content, that
+Checks the assets in `directory` (`public/cabin/` by default), and exits non-zero listing every failure. It checks
+that every file there is the one the manifest names, that each name matches its content, that
 the GLB is Draco-compressed with a `Cabin` mesh and `SeatBackLeft` and `SeatBackRight` meshes carrying lightmap UVs
 and a separate `Screen` mesh, that the lightmaps are day, night and the ambient layer, all
 AVIF of the same size, with `srgb-thrice` named as each one's encoding in the manifest, and that each surface

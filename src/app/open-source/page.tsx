@@ -4,10 +4,6 @@ import { SectionHeading, sectionId } from '@/components/lists';
 import { OpenSourceList } from '@/components/open-source-list';
 import { openSourceLede, openSourceRows } from '@/lib/open-source';
 
-// Full list of Packages — the overflow target of the home page's
-// capped "Open Source" section, filtered by Ecosystem and paged. Families stay
-// collapsed here too; their own page is the only place members are enumerated.
-// The Dependency Map is linked from this heading and from nowhere else.
 export const metadata: Metadata = {
   title: 'Open Source — Ki Hyun Park',
   description:
@@ -22,7 +18,6 @@ export default function OpenSourcePage() {
         title="Open Source"
         lede={openSourceLede}
         aside={
-          // Styled like "See all →", the other navigational link in this area.
           <Link
             href="/open-source/dependencies"
             className="shrink-0 text-sm text-muted-foreground transition-colors hover:text-foreground"

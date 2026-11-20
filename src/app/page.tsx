@@ -7,14 +7,6 @@ import { HOME_LIMIT } from '@/lib/home';
 import { openSourceLede, openSourceRows } from '@/lib/open-source';
 import { projects, projectsLede } from '@/lib/projects';
 
-// The Reading Home, with the Cabin mounted over it in the browser. It shows a
-// curated subset of each list, capped at HOME_LIMIT. Each list always links to
-// its full-list page (/open-source, /projects) — even when nothing overflows,
-// so those pages are never orphaned from the site's internal link graph. See
-// docs/adr/0005-curated-home-full-pages.md. Its sections are the ones the nav
-// entries and the Cabin Screen's tabs name (src/lib/home.ts); Blog and Online
-// list what those tabs list.
-
 export default function Home() {
   return (
     <>

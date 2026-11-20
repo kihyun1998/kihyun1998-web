@@ -15,7 +15,6 @@ import {
   type Press,
 } from './cabin-rules';
 
-// A quick, still press that starts and ends on the Cabin Screen.
 const press: Press = {
   start: { x: 100, y: 100, at: 1000, onScreen: true },
   end: { x: 100, y: 100, at: 1100, onScreen: true },
@@ -50,8 +49,7 @@ describe('isTap', () => {
     ).toBe(false);
   });
 
-  it('allows the pointer to move exactly 5 px', () => {
-    // A 3-4-5 triangle: 5 px in a straight line, on neither axis alone.
+  it('allows the pointer to move exactly 5 px in a straight line, on neither axis alone', () => {
     expect(isTap(ending({ x: 103, y: 104 }))).toBe(true);
   });
 
@@ -63,8 +61,7 @@ describe('isTap', () => {
     expect(isTap(ending({ y: 94.9 }))).toBe(false);
   });
 
-  it('rejects a press that moves more than 5 px along a diagonal', () => {
-    // 4 px on each axis is 5.66 px in a straight line.
+  it('rejects a press that moves 4 px on each axis, more than 5 px along the diagonal', () => {
     expect(isTap(ending({ x: 104, y: 104 }))).toBe(false);
   });
 
@@ -78,11 +75,6 @@ describe('isTap', () => {
 });
 
 describe('homeFor', () => {
-  // Every combination of the five inputs, written out: without WebGL, without
-  // AVIF or after a failed frame test it is the Reading Home whatever was
-  // chosen; otherwise the stored choice decides, and with none stored, reduced
-  // motion does.
-  // webgl, avif, frameTestFailed, reducedMotion, choice → home
   const cases = [
     [true, true, false, false, null, 'cabin'],
     [true, true, false, false, 'cabin', 'cabin'],
@@ -143,8 +135,7 @@ describe('homeFor', () => {
 });
 
 describe('fitOrbit', () => {
-  // The prototype cabin's inner box and the Cabin Screen's centre, in metres.
-  const cabin: Bounds = {
+  const prototypeCabin: Bounds = {
     min: { x: -0.61, y: 0.82, z: -0.6 },
     max: { x: 0.61, y: 1.26, z: 0.3 },
   };
@@ -152,31 +143,27 @@ describe('fitOrbit', () => {
   const offCentre: Point = { x: 0.2, y: 1.0, z: -0.945 };
   const underFloor: Point = { x: 0, y: 0.5, z: -0.945 };
   const inside: Point = { x: 0, y: 1.0, z: -0.3 };
-  // The Cabin's eye box and its orbit centre, 0.21 m above the Cabin Screen's
-  // centre, as the page uses them.
-  const seats: Bounds = {
+  const eyeBox: Bounds = {
     min: { x: -0.61, y: 0.82, z: -0.6 },
     max: { x: 0.61, y: 1.26, z: 0.07 },
   };
-  const aboveScreen: Point = { x: 0, y: 1.05, z: -0.945 };
-  // Side walls too far away to matter.
+  const orbitCentre: Point = { x: 0, y: 1.05, z: -0.945 };
   const wideCabin: Bounds = {
-    min: { ...cabin.min, x: -3 },
-    max: { ...cabin.max, x: 3 },
+    min: { ...prototypeCabin.min, x: -3 },
+    max: { ...prototypeCabin.max, x: 3 },
   };
-  // Floor, ceiling and front wall further away than the eye can reach.
   const hall: Bounds = {
-    min: { x: cabin.min.x, y: -5, z: -3 },
-    max: { x: cabin.max.x, y: 5, z: cabin.max.z },
+    min: { x: prototypeCabin.min.x, y: -5, z: -3 },
+    max: { x: prototypeCabin.max.x, y: 5, z: prototypeCabin.max.z },
   };
   const fixtures = [
-    { name: 'the screen', target: screen, bounds: cabin },
-    { name: 'an off-centre target', target: offCentre, bounds: cabin },
-    { name: 'a target under the floor', target: underFloor, bounds: cabin },
+    { name: 'the screen', target: screen, bounds: prototypeCabin },
+    { name: 'an off-centre target', target: offCentre, bounds: prototypeCabin },
+    { name: 'a target under the floor', target: underFloor, bounds: prototypeCabin },
     { name: 'the screen of a wide cabin', target: screen, bounds: wideCabin },
-    { name: 'a target inside the cabin', target: inside, bounds: cabin },
+    { name: 'a target inside the cabin', target: inside, bounds: prototypeCabin },
     { name: 'a target in a hall', target: inside, bounds: hall },
-    { name: 'a centre above the screen', target: aboveScreen, bounds: seats },
+    { name: 'a centre above the screen', target: orbitCentre, bounds: eyeBox },
   ];
 
   // Where three.js puts the eye for these angles
@@ -187,7 +174,6 @@ describe('fitOrbit', () => {
     z: target.z + radius * Math.sin(polar) * Math.cos(azimuth),
   });
 
-  // Inside the bounds by at least the margin, less rounding.
   const expectInside = (eye: Point, bounds: Bounds, margin = ORBIT_MARGIN) => {
     for (const axis of ['x', 'y', 'z'] as const) {
       expect(eye[axis]).toBeGreaterThanOrEqual(bounds.min[axis] + margin - 1e-9);
@@ -210,8 +196,6 @@ describe('fitOrbit', () => {
     });
   });
 
-  // The eye is furthest back and furthest sideways level with the target,
-  // which can lie between the polar limits rather than at a corner.
   it.each(fixtures)(
     'keeps the eye inside everywhere between the limits around $name',
     ({ target, bounds }) => {
@@ -230,14 +214,11 @@ describe('fitOrbit', () => {
   );
 
   it('fits the same orbit every time', () => {
-    expect(fitOrbit(cabin, screen)).toEqual(fitOrbit(cabin, screen));
+    expect(fitOrbit(prototypeCabin, screen)).toEqual(fitOrbit(prototypeCabin, screen));
   });
 
-  // Hand-computed from the box with the default 0.02 m margin: the radius
-  // reaches the back wall, the polar limits the ceiling and the floor, the
-  // azimuth limits the side walls.
-  it('uses the room the cabin has around the screen', () => {
-    const orbit = fitOrbit(cabin, screen);
+  it('uses the room the prototype cabin has around the screen, as hand-computed from its box', () => {
+    const orbit = fitOrbit(prototypeCabin, screen);
 
     expect(orbit.radius).toBeCloseTo(1.225, 6);
     expect(orbit.minPolar).toBeCloseTo(1.238166, 5);
@@ -247,7 +228,7 @@ describe('fitOrbit', () => {
   });
 
   it('turns further toward the far wall when the target is off-centre', () => {
-    const orbit = fitOrbit(cabin, offCentre);
+    const orbit = fitOrbit(prototypeCabin, offCentre);
 
     expect(orbit.minPolar).toBeCloseTo(1.373602, 5);
     expect(orbit.maxPolar).toBeCloseTo(1.701783, 5);
@@ -255,12 +236,8 @@ describe('fitOrbit', () => {
     expect(orbit.minAzimuth).toBeCloseTo(-0.700890, 5);
   });
 
-  // Hand-computed from the eye box: the polar limits put the eye at the
-  // ceiling and the floor less the margin (acos of each height over the
-  // radius), the azimuth limits at the side walls with the eye level. The
-  // centre stands above the floor, so the range runs past level.
-  it('looks up past level around a centre above the screen', () => {
-    const orbit = fitOrbit(seats, aboveScreen);
+  it('looks up past level around the orbit centre above the screen, as hand-computed from the eye box', () => {
+    const orbit = fitOrbit(eyeBox, orbitCentre);
 
     expect(orbit.radius).toBeCloseTo(0.995, 6);
     expect(orbit.minPolar).toBeCloseTo(1.378662, 5);
@@ -269,10 +246,8 @@ describe('fitOrbit', () => {
     expect(orbit.minAzimuth).toBeCloseTo(-0.634736, 5);
   });
 
-  // With the whole polar range above level, the eye swings widest at the
-  // lowest polar limit, and that is where the side walls are met.
   it('fits the side walls where the eye swings widest', () => {
-    const orbit = fitOrbit(cabin, underFloor);
+    const orbit = fitOrbit(prototypeCabin, underFloor);
 
     expect(orbit.minPolar).toBeCloseTo(0.922183, 5);
     expect(orbit.maxPolar).toBeCloseTo(1.289552, 5);
@@ -288,7 +263,7 @@ describe('fitOrbit', () => {
   });
 
   it('turns past side-on around a target inside the cabin, up to the front wall', () => {
-    const orbit = fitOrbit(cabin, inside);
+    const orbit = fitOrbit(prototypeCabin, inside);
 
     expect(orbit.radius).toBeCloseTo(0.58, 6);
     expect(orbit.maxAzimuth).toBeCloseTo(2.074598, 5);
@@ -306,38 +281,34 @@ describe('fitOrbit', () => {
 
   it('keeps the eye a wider margin from the walls when asked', () => {
     const margin = 0.1;
-    const orbit = fitOrbit(cabin, screen, margin);
+    const orbit = fitOrbit(prototypeCabin, screen, margin);
 
     expect(orbit.radius).toBeCloseTo(1.145, 6);
     for (const { azimuth, polar } of corners) {
-      expectInside(eyeAt(screen, orbit.radius, orbit[azimuth], orbit[polar]), cabin, margin);
+      expectInside(eyeAt(screen, orbit.radius, orbit[azimuth], orbit[polar]), prototypeCabin, margin);
     }
   });
 
-  // Each refusal names the wall the fit ran out of room at.
   it.each([
-    // Every eye position facing the target is outside.
     { name: 'behind the back wall', target: { x: 0, y: 1, z: 0.5 }, wall: /back wall/ },
     { name: 'right of the cabin', target: { x: 0.9, y: 1, z: -0.945 }, wall: /side walls/ },
     { name: 'left of the cabin', target: { x: -0.9, y: 1, z: -0.945 }, wall: /side walls/ },
-    // Further from the ceiling, or the floor, than the radius reaches.
     { name: 'far above the ceiling', target: { x: 0, y: 3, z: -0.945 }, wall: /floor and ceiling/ },
     { name: 'far under the floor', target: { x: 0, y: -1, z: -0.945 }, wall: /floor and ceiling/ },
-    // The eye, raised under the ceiling, falls short of the front wall.
     { name: 'too low for the front wall', target: { x: 0, y: 0.05, z: -0.945 }, wall: /front/ },
   ])('refuses a target $name', ({ target, wall }) => {
-    expect(() => fitOrbit(cabin, target)).toThrow(RangeError);
-    expect(() => fitOrbit(cabin, target)).toThrow(wall);
+    expect(() => fitOrbit(prototypeCabin, target)).toThrow(RangeError);
+    expect(() => fitOrbit(prototypeCabin, target)).toThrow(wall);
   });
 
   it('refuses a target on the back wall, where the radius would be nothing', () => {
-    expect(() => fitOrbit(cabin, { x: 0, y: 1, z: 0.3 }, 0)).toThrow(/back wall/);
+    expect(() => fitOrbit(prototypeCabin, { x: 0, y: 1, z: 0.3 }, 0)).toThrow(/back wall/);
   });
 
   it('refuses a cabin too low to hold the margin under the ceiling and over the floor', () => {
     const crawlSpace: Bounds = {
-      min: { ...cabin.min, y: 1.0 },
-      max: { ...cabin.max, y: 1.03 },
+      min: { ...prototypeCabin.min, y: 1.0 },
+      max: { ...prototypeCabin.max, y: 1.03 },
     };
 
     const target = { x: 0, y: 1.01, z: -0.945 };
@@ -361,7 +332,6 @@ describe('isNear', () => {
     expect(isNear(seatBack, { x: -0.03, y: 1.0, z: 0 }, 0.1)).toBe(false);
   });
 
-  // 0.06 m past two faces is 0.085 m from their edge, 0.08 m past them 0.113 m.
   it('measures straight to the nearest edge or corner, not along each axis', () => {
     expect(isNear(seatBack, { x: 0.02, y: 1.27, z: 0 }, 0.1)).toBe(true);
     expect(isNear(seatBack, { x: 0.0, y: 1.29, z: 0 }, 0.1)).toBe(false);
@@ -376,7 +346,6 @@ describe('isNear', () => {
 });
 
 describe('fovFor', () => {
-  // The horizontal field of view a vertical one gives at an aspect, in degrees.
   const across = (fov: number, aspect: number) =>
     (2 * Math.atan(Math.tan((fov * Math.PI) / 360) * aspect) * 180) / Math.PI;
 

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source not "../../docs";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -174,8 +175,6 @@
   }
 }
 
-/* The look of the Cabin's loading state, shared by the <head> cover and the
-   Cabin's own status line. */
 @utility cabin-loading {
   @apply flex items-center justify-center bg-[#0b0c0e] text-sm text-white/70;
 }
@@ -187,15 +186,10 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
-  /* Visible keyboard focus. The tweakcn default (outline-ring/50, no width)
-     was effectively invisible; this is a real 2px ring. */
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
-  /* Staggered page-load entrance: each top-level block fades + slides up,
-     top to bottom. Spans the layout shell (header/footer) and the page
-     content because they're all direct children of <main>. */
   main > * {
     animation: enter 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
   }
@@ -211,10 +205,8 @@
   main > *:nth-child(5) {
     animation-delay: 320ms;
   }
-  /* The Cabin's loading cover, drawn from the first frame while the <head>
-     script's mark reads "cover" (src/lib/cabin-cover.ts), in the look of the
-     Cabin's own loading state. Its text has an empty alternative text; the
-     first `content` is for browsers without that syntax. */
+  /* The first `content` is for browsers without the alternative-text syntax,
+     which drop the declaration that uses it. */
   html[data-cabin='cover'] {
     overflow: hidden;
   }
@@ -223,11 +215,6 @@
     content: 'Loading the Cabin…' / '';
     @apply cabin-loading fixed inset-0 z-40;
   }
-  /* The site header: the wordmark over the nav area. While the Cabin is
-     shown (src/components/cabin.tsx marks <html>), it lies over the Cabin as
-     a bar across the top, in white, the wordmark beside the nav area; the
-     bar itself takes no pointer, so a drag that starts on it reaches the
-     Cabin. */
   .site-header {
     display: flex;
     flex-direction: column;
@@ -254,8 +241,6 @@
   html[data-home='cabin'] .site-header > * {
     pointer-events: auto;
   }
-  /* Respect reduced-motion: neutralize the color/opacity transitions used
-     on links, toggles, and hover states, plus the entrance animation. */
   @media (prefers-reduced-motion: reduce) {
     *,
     ::before,

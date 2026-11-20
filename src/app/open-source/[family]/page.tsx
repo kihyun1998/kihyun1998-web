@@ -4,21 +4,12 @@ import { BackLink, Section } from '@/components/lists';
 import { PackageRow } from '@/components/open-source-row';
 import { families, resolveFamily } from '@/lib/open-source';
 
-// A Family page — the expansion of a collapsed Family row. It lists member
-// Packages and nothing else: no blurb, no per-member description. ADR-0003's
-// reasoning applies one level up. See docs/adr/0007-package-families.md.
-//
-// Members render as ordinary Package rows (Ecosystem tag, registry and repo
-// links), so ADR-0009 holds for Packages wherever they appear.
-
 type Params = { family: string };
 
 export function generateStaticParams(): Params[] {
   return families.map((family) => ({ family: family.slug }));
 }
 
-// Every Family page is known at build time; an unknown slug is a 404, not a
-// page rendered on demand.
 export const dynamicParams = false;
 
 export async function generateMetadata({

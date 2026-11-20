@@ -3,9 +3,6 @@ import { DependencyMap } from '@/components/dependency-map';
 import { BackLink } from '@/components/lists';
 import { dependencyGraph } from '@/lib/open-source';
 
-// The Dependency Map. A static segment, so it wins over /open-source/[family];
-// `dependencies` is a reserved Family slug for the same reason.
-// See docs/adr/0010-dependency-map.md.
 export const metadata: Metadata = {
   title: 'Dependencies — Ki Hyun Park',
   description: 'Which of Ki Hyun Park’s open-source packages build on which.',

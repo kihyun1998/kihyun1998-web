@@ -6,11 +6,9 @@ OUT = os.environ.get('CABIN_OUT') or os.path.join(HERE, 'out')
 os.makedirs(OUT, exist_ok=True)
 for stale in glob.glob(os.path.join(OUT, 'tex_*.png')) + [os.path.join(OUT, 'textures.json')]:
     if os.path.isfile(stale): os.remove(stale)
-MEAN = 0.8      # the tile's linear mean
+MEAN = 0.8
 
 def band(rng, n, longest, shortest, stretch=1.0):
-    """seamless noise of unit spread, its features between `longest` and `shortest` pixels across; `stretch` > 1
-    draws them that many times longer across the image than down it"""
     fy, fx = np.meshgrid(np.fft.fftfreq(n), np.fft.fftfreq(n), indexing='ij')
     r = np.hypot(fx * stretch, fy)
     lo, hi = 1 / longest, 1 / shortest
@@ -20,8 +18,6 @@ def band(rng, n, longest, shortest, stretch=1.0):
     return out / out.std()
 
 def cells(rng, n, count):
-    """seamless cells, `count` across the tile: the distance to the nearest and second-nearest cell centre and the
-    nearest cell's number, distances in cells"""
     seeds = rng.random((count, count, 2))
     y, x = (np.mgrid[0:n, 0:n] + 0.5) * count / n
     f1 = np.full((n, n), 9.0); f2 = np.full((n, n), 9.0); owner = np.zeros((n, n), dtype=np.int64)
@@ -41,26 +37,21 @@ def smoothstep(a, b, x): t = np.clip((x - a) / (b - a), 0, 1); return t * t * (3
 def unit(x): return (x - x.mean()) / x.std()
 
 def leather(rng, n):
-    """pebble grain: cells parted by darker creases, and a faint mottle"""
     f1, f2, owner = cells(rng, n, 96)
     pebble = smoothstep(0.0, 0.45, f2 - f1) * (0.75 + 0.25 * rng.random(96 * 96)[owner])
     return 1 + 0.05 * unit(pebble) + 0.04 * band(rng, n, n / 2, n / 8)
 
 def felt(rng, n):
-    """a matte pressed fabric: fine fibre noise, short fibres along one way, and a soft cloudiness"""
     fibre = band(rng, n, 6, 1.5) + 0.6 * band(rng, n, 20, 4, stretch=4.0)
     return 1 + 0.05 * fibre + 0.03 * band(rng, n, n / 6, n / 24)
 
 def stipple(rng, n):
-    """moulded plastic grain: small low bumps and a faint unevenness"""
     f1, _, _ = cells(rng, n, 160)
     return 1 + 0.03 * unit(-f1) + 0.02 * band(rng, n, 4, 1.5) + 0.015 * band(rng, n, n / 4, n / 16)
 
-# kind: (generator, tile size in metres, pixels across, seed)
 KINDS = {'leather': (leather, 0.25, 512, 48), 'felt': (felt, 0.2, 512, 49), 'stipple': (stipple, 0.15, 512, 50)}
 PHOTOS = {'carpet': {'url': 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/dirty_carpet/dirty_carpet_diff_2k.jpg',
                      'sha256': '6337d3ef1a11ca8bea2d31b86da15a65f10ae92c7f3345fae62924bae194f6c0', 'tile': 0.6, 'px': 512}}
-# Cabin material: the kind of surface it is drawn with
 MATERIALS = {'leather': 'leather', 'insert': 'felt', 'headliner': 'felt', 'carpet': 'carpet',
              'dash': 'stipple', 'dashBand': 'stipple', 'darkGrey': 'stipple', 'midGrey': 'stipple',
              'lightGrey': 'stipple', 'frame': 'stipple'}
@@ -72,7 +63,6 @@ def srgb(x): return np.where(x <= 0.0031308, x * 12.92, 1.055 * np.power(np.maxi
 TILES = {}
 
 def write(kind, tile, colour):
-    """save a linear grey tile, its rows in Blender's order (bottom up), as tex_<kind>.png"""
     n = colour.shape[0]; TILES[kind] = tile
     img = bpy.data.images.new(f'tex_{kind}', n, n, alpha=False); img.colorspace_settings.name = 'Non-Color'
     buf = np.ones((n, n, 4), dtype=np.float32); buf[:, :, :3] = srgb(colour)[:, :, None]
@@ -81,7 +71,7 @@ def write(kind, tile, colour):
 
 for kind, (make, tile, n, seed) in KINDS.items():
     colour = make(np.random.default_rng(seed), n)
-    write(kind, tile, np.clip(colour * MEAN / colour.mean(), 0, 1)[::-1])
+    write(kind, tile, np.clip(colour * MEAN / colour.mean(), 0, 1)[::-1])   # Blender's image pixels run bottom row first
     print(f'WROTE tex_{kind}.png')
 
 def sha256_of(path):
