@@ -1,14 +1,3 @@
-# Compress the baked Cabin into the files the site serves. Run in headless Blender:
-#   blender -b --factory-startup --python compress.py [-- <lightmap AVIF quality, default 90> [<texture AVIF quality, default 80>]]
-# Reads cabin.glb, light_day_dn.hdr, light_night_dn.hdr and light_ambient_dn.hdr from $CABIN_OUT (or out/ beside this file), and the surface
-# textures textures.py wrote there, and writes into public/cabin/:
-#   cabin.<hash>.glb          the same scene with Draco mesh compression
-#   light-<tag>.<hash>.avif   the lightmap's linear light / scale, the sRGB curve applied three times, in 8 bits
-#   tex-<kind>.<hash>.avif    each kind of surface texture's grey tile, sRGB
-#   manifest.json             the current file names, each lightmap's scale and encoding (srgb-thrice), each
-#                             surface texture's tile size in metres and its file's linear mean, and the kind each
-#                             material uses (surfaces)
-# <hash> is the first 8 hex digits of the file's SHA-256. Files of an earlier version are removed.
 import bpy, sys, os, json, hashlib, glob
 import numpy as np
 
@@ -21,7 +10,6 @@ TEXTURE_QUALITY = int(args[1]) if len(args) > 1 else 80
 os.makedirs(DST, exist_ok=True)
 
 def publish(tmp, stem, ext):
-    """move tmp to <stem>.<hash>.<ext> in DST, dropping that asset's earlier versions; returns the file name"""
     digest = hashlib.sha256(open(tmp, 'rb').read()).hexdigest()[:8]
     for old in glob.glob(os.path.join(DST, f'{stem}.*')): os.remove(old)
     name = f'{stem}.{digest}.{ext}'; os.replace(tmp, os.path.join(DST, name))
@@ -33,7 +21,7 @@ def srgb(x): return np.where(x <= 0.0031308, x * 12.92, 1.055 * np.power(np.maxi
 def lightmap(tag):
     src = bpy.data.images.load(os.path.join(SRC, f'light_{tag}_dn.hdr')); w, h = src.size
     px = np.empty(w * h * 4, dtype=np.float32); src.pixels.foreach_get(px); rgb = px.reshape(h, w, 4)[:, :, :3]
-    scale = float(np.ceil(rgb.max() * 4) / 4)   # the brightest texel maps to at most 1
+    scale = float(np.ceil(rgb.max() * 4) / 4)
     out = bpy.data.images.new(f'light-{tag}', w, h, alpha=False); out.colorspace_settings.name = 'Non-Color'
     buf = np.ones((h, w, 4), dtype=np.float32); buf[:, :, :3] = np.clip(srgb(srgb(srgb(rgb / scale))), 0, 1)
     out.pixels.foreach_set(buf.ravel())

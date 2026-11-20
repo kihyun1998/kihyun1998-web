@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""Bake the Cabin on a Kaggle GPU notebook and download the outputs. Needs Python 3 and the Kaggle CLI.
-
-    python3 tools/cabin/bake_kaggle.py [size, default 2048] [samples, default 256]
-
-Pushes cabin.py inside a script kernel, waits for the run, and downloads cabin.glb, light_day.hdr,
-light_night.hdr, light_ambient.hdr, the Cycles day renders and the run log into $CABIN_OUT (or out/ beside this file).
-Denoised lightmaps (light_*_dn.hdr) left there by an earlier bake are removed.
-The Kaggle CLI is `kaggle` on PATH, or the path in $KAGGLE.
-"""
 import json, os, re, secrets, subprocess, sys, tempfile, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -19,7 +10,6 @@ SIZE = int(sys.argv[1]) if len(sys.argv) > 1 else 2048
 SAMPLES = int(sys.argv[2]) if len(sys.argv) > 2 else 256
 POLL_S, TIMEOUT_S = 10, 20 * 60
 
-# The script the kernel runs: fetch Blender, write cabin.py, bake, leave only the outputs in /kaggle/working.
 KERNEL_SCRIPT = '''import os, subprocess, time
 t0 = time.time(); os.chdir('/kaggle/working')
 print('RUN', {run!r}, flush=True)
@@ -42,7 +32,6 @@ def kaggle(*args):
     return r.stdout
 
 def log_lines():
-    """the kernel's stdout lines from the downloaded log, or [] when there is none yet"""
     path = os.path.join(OUT, KERNEL.split('/')[1] + '.log')
     if not os.path.isfile(path): return []
     with open(path) as f: records = json.load(f)

@@ -16,9 +16,7 @@ import { openSourceRows } from './open-source';
 import { projects } from './projects';
 import { BLOG_URL, GITHUB_URL } from './site';
 
-// Every glyph is 0.5 em wide: enough to make widths depend on the text and
-// the font size without a canvas.
-const measure = (text: string, font: string) =>
+const halfEmPerGlyph = (text: string, font: string) =>
   text.length * Number(/(\d+)px/.exec(font)![1]) * 0.5;
 
 const state = (over: Partial<ScreenState> = {}): ScreenState => ({
@@ -170,13 +168,13 @@ describe('the Cabin Screen layout', () => {
   });
 
   it('shows the time and the speed', () => {
-    const drawn = texts(layoutScreen(state({ time: '18:05', speed: 47.6 }), measure).ops);
+    const drawn = texts(layoutScreen(state({ time: '18:05', speed: 47.6 }), halfEmPerGlyph).ops);
     expect(drawn.some((op) => op.text === '18:05')).toBe(true);
     expect(drawn.some((op) => op.text === '48 km/h')).toBe(true);
   });
 
   it('has a zone for each tab, found again from its centre', () => {
-    const { zones } = layoutScreen(state(), measure);
+    const { zones } = layoutScreen(state(), halfEmPerGlyph);
     const tabs = zones.filter((zone) => zone.kind === 'tab');
     expect(tabs.map((zone) => zone.tab)).toEqual(HOME_SECTIONS.map((section) => section.id));
     for (const zone of tabs) expect(zoneAt(zones, ...centre(zone))).toBe(zone);
@@ -185,7 +183,7 @@ describe('the Cabin Screen layout', () => {
   it.each(HOME_SECTIONS.map((section) => section.id))(
     'on the %s tab, keeps every zone on the screen and apart from the others',
     (tab) => {
-      const { zones } = layoutScreen(state({ tab }), measure);
+      const { zones } = layoutScreen(state({ tab }), halfEmPerGlyph);
       for (const zone of zones) expect(inside(zone)).toBe(true);
       zones.forEach((a, i) => {
         for (const b of zones.slice(i + 1)) expect(overlap(a, b)).toBe(false);
@@ -195,7 +193,7 @@ describe('the Cabin Screen layout', () => {
 
   it('has a zone for each item and for See all, opening that destination', () => {
     const content = screenContent('open-source', 'en');
-    const { zones } = layoutScreen(state({ tab: 'open-source' }), measure);
+    const { zones } = layoutScreen(state({ tab: 'open-source' }), halfEmPerGlyph);
     const items = zones.filter((zone) => zone.kind === 'item');
     expect(items.map((zone) => zone.href)).toEqual([
       ...content.items.map((item) => item.href),
@@ -205,7 +203,7 @@ describe('the Cabin Screen layout', () => {
   });
 
   it('finds nothing off the zones', () => {
-    const { zones } = layoutScreen(state({ tab: 'blog' }), measure);
+    const { zones } = layoutScreen(state({ tab: 'blog' }), halfEmPerGlyph);
     expect(zoneAt(zones, -1, -1)).toBeNull();
     expect(zoneAt(zones, SCREEN_WIDTH - 1, SCREEN_HEIGHT - 1)).toBeNull();
   });
@@ -218,7 +216,7 @@ describe('the Cabin Screen layout', () => {
         { name: 'flutter_bin', meta: 'Flutter', href: 'https://pub.dev/packages/flutter_bin' },
       ],
     };
-    const drawn = texts(layoutScreen(state({ tab: 'projects' }), measure, content).ops).map(
+    const drawn = texts(layoutScreen(state({ tab: 'projects' }), halfEmPerGlyph, content).ops).map(
       (op) => op.text,
     );
     expect(drawn).toEqual(
@@ -227,9 +225,9 @@ describe('the Cabin Screen layout', () => {
   });
 
   it('fills the hovered zone and no other', () => {
-    const plain = layoutScreen(state({ tab: 'projects' }), measure);
+    const plain = layoutScreen(state({ tab: 'projects' }), halfEmPerGlyph);
     const item = plain.zones.filter((zone) => zone.kind === 'item')[2];
-    const hovered = layoutScreen(state({ tab: 'projects', hover: item.key }), measure);
+    const hovered = layoutScreen(state({ tab: 'projects', hover: item.key }), halfEmPerGlyph);
     const fills = (ops: typeof plain.ops) => ops.filter((op) => op.type === 'rect');
     const added = fills(hovered.ops).filter(
       (rect) => !fills(plain.ops).some((other) => JSON.stringify(other) === JSON.stringify(rect)),
@@ -240,8 +238,8 @@ describe('the Cabin Screen layout', () => {
   });
 
   it('marks the open tab and no other', () => {
-    const about = layoutScreen(state({ tab: 'about' }), measure);
-    const blog = layoutScreen(state({ tab: 'blog' }), measure);
+    const about = layoutScreen(state({ tab: 'about' }), halfEmPerGlyph);
+    const blog = layoutScreen(state({ tab: 'blog' }), halfEmPerGlyph);
     const pill = (layout: typeof about, tab: string) => {
       const zone = layout.zones.find((z) => z.kind === 'tab' && z.tab === tab)!;
       return layout.ops.filter((op) => op.type === 'rect' && op.x === zone.x0 && op.y === zone.y0);
@@ -254,7 +252,7 @@ describe('the Cabin Screen layout', () => {
 
   it('draws a dark screen at night and a light one by day', () => {
     const background = (lighting: 'day' | 'night') => {
-      const first = layoutScreen(state({ lighting }), measure).ops[0];
+      const first = layoutScreen(state({ lighting }), halfEmPerGlyph).ops[0];
       return first.type === 'rect' ? first.color : '';
     };
     expect(background('day')).toBe('#f3f4f6');
@@ -264,11 +262,11 @@ describe('the Cabin Screen layout', () => {
   it('breaks the Identity Statement into lines that fit, losing no word', () => {
     const long = Array.from({ length: 40 }, (_, index) => `word${index}`).join(' ');
     const content: ScreenContent = { title: 'Ki Hyun Park', statement: long, items: [] };
-    const drawn = texts(layoutScreen(state(), measure, content).ops);
+    const drawn = texts(layoutScreen(state(), halfEmPerGlyph, content).ops);
     const lines = drawn.filter((op) => op.text.startsWith('word'));
     expect(lines.length).toBeGreaterThan(1);
     for (const line of lines) {
-      expect(line.x + measure(line.text, line.font)).toBeLessThanOrEqual(SCREEN_WIDTH - line.x);
+      expect(line.x + halfEmPerGlyph(line.text, line.font)).toBeLessThanOrEqual(SCREEN_WIDTH - line.x);
     }
     expect(lines.map((line) => line.text).join(' ')).toBe(long);
   });
@@ -283,15 +281,15 @@ describe('the Cabin Screen layout', () => {
         href: `https://example.com/${index}`,
       })),
     };
-    const { ops, zones } = layoutScreen(state({ tab: 'open-source' }), measure, content);
+    const { ops, zones } = layoutScreen(state({ tab: 'open-source' }), halfEmPerGlyph, content);
     const drawn = texts(ops);
     const shortened = drawn.find((op) => op.text.endsWith('…'))!;
     const tag = drawn.find((op) => op.text === 'Flutter')!;
     expect(drawn.some((op) => op.text === name)).toBe(false);
     expect(name.startsWith(shortened.text.slice(0, -1))).toBe(true);
     expect(tag.align).toBe('right');
-    expect(shortened.x + measure(shortened.text, shortened.font)).toBeLessThan(
-      tag.x - measure(tag.text, tag.font),
+    expect(shortened.x + halfEmPerGlyph(shortened.text, shortened.font)).toBeLessThan(
+      tag.x - halfEmPerGlyph(tag.text, tag.font),
     );
     expect(zones.filter((zone) => zone.kind === 'item')).toHaveLength(4);
   });

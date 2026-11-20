@@ -14,8 +14,7 @@ import {
 } from './cabin-cover';
 import { homeFor, type StoredHome } from './cabin-rules';
 
-// A stand-in for <html>: only the attribute calls the script and helpers make.
-class Root {
+class FakeHtml {
   attributes = new Map<string, string>();
   getAttribute(name: string) {
     return this.attributes.get(name) ?? null;
@@ -28,9 +27,7 @@ class Root {
   }
 }
 
-// A stand-in clock: setTimeout, clearTimeout and performance.now, moved on by
-// hand.
-class Clock {
+class ManualClock {
   now: number;
   private timers = new Map<number, { at: number; fire: () => void }>();
   private next = 1;
@@ -70,9 +67,7 @@ type Page = {
   now?: number;
 };
 
-// A stand-in for the probe's <img>: records the source it was given; `answer`
-// fires onload or onerror.
-class ProbeImage {
+class FakeProbeImage {
   src = '';
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
@@ -82,9 +77,7 @@ class ProbeImage {
   }
 }
 
-// Runs the head script against the given page and returns <html>, the clock,
-// a way to change the page's visibility, and the events it dispatched.
-function run({
+function runHeadScript({
   path = '/',
   storage = {},
   webgl = true,
@@ -92,14 +85,14 @@ function run({
   hidden = false,
   now = 20,
 }: Page) {
-  const root = new Root();
-  const clock = new Clock(now);
+  const root = new FakeHtml();
+  const clock = new ManualClock(now);
   const dispatched: string[] = [];
   const listeners = new Set<() => void>();
   const contexts = { made: 0 };
-  const images: ProbeImage[] = [];
+  const images: FakeProbeImage[] = [];
   const Image = function () {
-    const image = new ProbeImage();
+    const image = new FakeProbeImage();
     images.push(image);
     return image;
   };
@@ -159,7 +152,7 @@ function run({
   return { root, clock, setHidden, dispatched, listeners, contexts, images };
 }
 
-const covered = (page: Page) => run(page).root.getAttribute(COVER_ATTRIBUTE) === 'cover';
+const covered = (page: Page) => runHeadScript(page).root.getAttribute(COVER_ATTRIBUTE) === 'cover';
 
 describe('coverScript', () => {
   it('covers the home page for a first-time visitor with WebGL 2', () => {
@@ -180,11 +173,11 @@ describe('coverScript', () => {
   });
 
   it('creates no WebGL context when the stored state alone rules the Cabin out', () => {
-    expect(run({ storage: { [CHOICE_KEY]: 'reading-home' } }).contexts.made).toBe(0);
-    expect(run({ storage: { [FRAME_TEST_KEY]: 'failed' } }).contexts.made).toBe(0);
-    expect(run({ reducedMotion: true }).contexts.made).toBe(0);
-    expect(run({}).contexts.made).toBe(1);
-    expect(run({ reducedMotion: true, storage: { [CHOICE_KEY]: 'cabin' } }).contexts.made).toBe(1);
+    expect(runHeadScript({ storage: { [CHOICE_KEY]: 'reading-home' } }).contexts.made).toBe(0);
+    expect(runHeadScript({ storage: { [FRAME_TEST_KEY]: 'failed' } }).contexts.made).toBe(0);
+    expect(runHeadScript({ reducedMotion: true }).contexts.made).toBe(0);
+    expect(runHeadScript({}).contexts.made).toBe(1);
+    expect(runHeadScript({ reducedMotion: true, storage: { [CHOICE_KEY]: 'cabin' } }).contexts.made).toBe(1);
   });
 
   it('covers when localStorage throws, as nothing stored', () => {
@@ -200,7 +193,6 @@ describe('coverScript', () => {
     const choices = [null, 'cabin', 'reading-home', 'something-else'];
     const frameTests = [null, 'failed', 'passed'];
     const avifs = [null, 'unsupported', 'something-else'];
-    // The probe's answer: not yet, decodes, does not decode.
     const answers = [null, true, false];
     let cabins = 0;
     let runs = 0;
@@ -223,26 +215,25 @@ describe('coverScript', () => {
                 });
                 runs++;
                 if (home === 'cabin') cabins++;
-                const page = run({ webgl, reducedMotion, storage });
+                const page = runHeadScript({ webgl, reducedMotion, storage });
                 if (answer !== null) for (const image of page.images) image.answer(answer);
                 expect(
                   page.root.getAttribute(COVER_ATTRIBUTE) === 'cover',
                   JSON.stringify({ webgl, reducedMotion, storage, answer }),
                 ).toBe(home === 'cabin');
               }
-    // The window is not vacuous: both outcomes occur.
-    expect(cabins).toBeGreaterThan(0);
-    expect(cabins).toBeLessThan(runs);
+    expect(cabins, 'some combination covers').toBeGreaterThan(0);
+    expect(cabins, 'some combination does not cover').toBeLessThan(runs);
   });
 
   it('covers at once while the AVIF probe has not answered, and probes the probe image once', () => {
-    const { root, images } = run({});
+    const { root, images } = runHeadScript({});
     expect(root.getAttribute(COVER_ATTRIBUTE)).toBe('cover');
     expect(images.map((image) => image.src)).toEqual([AVIF_PROBE]);
   });
 
   it('lifts the cover when the AVIF probe fails, and keeps it when the probe decodes', () => {
-    const failed = run({});
+    const failed = runHeadScript({});
     failed.images[0].answer(false);
     expect(failed.root.getAttribute(COVER_ATTRIBUTE)).toBe(null);
     expect(failed.dispatched).toEqual([]);
@@ -250,20 +241,20 @@ describe('coverScript', () => {
     expect(failed.root.getAttribute(COVER_ATTRIBUTE)).toBe(null);
     expect(failed.dispatched).toEqual([]);
 
-    const decoded = run({});
+    const decoded = runHeadScript({});
     decoded.images[0].answer(true);
     expect(decoded.root.getAttribute(COVER_ATTRIBUTE)).toBe('cover');
   });
 
   it('keeps a give-up when the AVIF probe fails after it', () => {
-    const { root, clock, images } = run({});
+    const { root, clock, images } = runHeadScript({});
     clock.advance(COVER_LIMIT_MS);
     images[0].answer(false);
     expect(root.getAttribute(COVER_ATTRIBUTE)).toBe('gave-up');
   });
 
   it('leaves the page uncovered, creates no WebGL context and probes nothing when AVIF is stored as unsupported', () => {
-    const page = run({ storage: { [AVIF_KEY]: 'unsupported' } });
+    const page = runHeadScript({ storage: { [AVIF_KEY]: 'unsupported' } });
     expect(page.root.getAttribute(COVER_ATTRIBUTE)).toBe(null);
     expect(page.contexts.made).toBe(0);
     expect(page.images).toEqual([]);
@@ -271,13 +262,13 @@ describe('coverScript', () => {
   });
 
   it('probes nothing when it does not cover', () => {
-    expect(run({ webgl: false }).images).toEqual([]);
-    expect(run({ reducedMotion: true }).images).toEqual([]);
-    expect(run({ path: '/projects' }).images).toEqual([]);
+    expect(runHeadScript({ webgl: false }).images).toEqual([]);
+    expect(runHeadScript({ reducedMotion: true }).images).toEqual([]);
+    expect(runHeadScript({ path: '/projects' }).images).toEqual([]);
   });
 
   it('gives up at the limit, counted from the start of the page load', () => {
-    const { root, clock, dispatched } = run({ now: 120 });
+    const { root, clock, dispatched } = runHeadScript({ now: 120 });
     clock.advance(COVER_LIMIT_MS - 121);
     expect(root.getAttribute(COVER_ATTRIBUTE)).toBe('cover');
     expect(dispatched).toEqual([]);
@@ -287,7 +278,7 @@ describe('coverScript', () => {
   });
 
   it('counts only the time the page is visible', () => {
-    const { root, clock, setHidden, dispatched } = run({ now: 0 });
+    const { root, clock, setHidden, dispatched } = runHeadScript({ now: 0 });
     clock.advance(1000);
     setHidden(true);
     clock.advance(60_000);
@@ -301,7 +292,7 @@ describe('coverScript', () => {
   });
 
   it('starts counting when a page loaded hidden is first shown', () => {
-    const { root, clock, setHidden } = run({ now: 300, hidden: true });
+    const { root, clock, setHidden } = runHeadScript({ now: 300, hidden: true });
     clock.advance(60_000);
     expect(root.getAttribute(COVER_ATTRIBUTE)).toBe('cover');
     setHidden(false);
@@ -312,7 +303,7 @@ describe('coverScript', () => {
   });
 
   it('stops listening once it gave up', () => {
-    const { clock, listeners } = run({});
+    const { clock, listeners } = runHeadScript({});
     expect(listeners.size).toBe(1);
     clock.advance(COVER_LIMIT_MS);
     expect(listeners.size).toBe(0);
@@ -320,7 +311,7 @@ describe('coverScript', () => {
   });
 
   it('does nothing at the limit once the cover was lifted', () => {
-    const { root, clock, dispatched } = run({});
+    const { root, clock, dispatched } = runHeadScript({});
     liftCover(root);
     clock.advance(COVER_LIMIT_MS);
     expect(root.getAttribute(COVER_ATTRIBUTE)).toBe(null);
@@ -328,14 +319,13 @@ describe('coverScript', () => {
   });
 
   it('sets no timer and no listener when it does not cover', () => {
-    const { clock, listeners } = run({ webgl: false });
+    const { clock, listeners } = runHeadScript({ webgl: false });
     expect(clock.pending).toBe(0);
     expect(listeners.size).toBe(0);
   });
 });
 
 describe('avifFor', () => {
-  // stored, answer → decodes on this load
   const cases = [
     [null, null, null],
     [null, true, true],
@@ -354,20 +344,20 @@ describe('avifFor', () => {
 
 describe('liftCover and coverState', () => {
   it('reads the cover the head script set, and lifts it', () => {
-    const { root } = run({});
+    const { root } = runHeadScript({});
     expect(coverState(root)).toBe('cover');
     liftCover(root);
     expect(coverState(root)).toBe(null);
   });
 
   it('keeps a give-up when lifting', () => {
-    const { root, clock } = run({});
+    const { root, clock } = runHeadScript({});
     clock.advance(COVER_LIMIT_MS);
     liftCover(root);
     expect(coverState(root)).toBe('gave-up');
   });
 
   it('reads no cover on a page the script left alone', () => {
-    expect(coverState(run({ webgl: false }).root)).toBe(null);
+    expect(coverState(runHeadScript({ webgl: false }).root)).toBe(null);
   });
 });

@@ -6,11 +6,6 @@ import {
   type Project,
 } from './projects';
 
-// A Project's optional description is the only computed-ish thing here: the
-// rules that keep it a short clause are invisible in the array, so they are
-// asserted rather than left to review. Fixtures drive the failure cases so the
-// real curated data is never mutated.
-
 describe('validateProjects', () => {
   it('accepts a Project with no description', () => {
     const entries: Project[] = [{ name: 'Bare', href: 'https://example.test' }];

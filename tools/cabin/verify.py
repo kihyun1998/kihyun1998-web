@@ -1,10 +1,4 @@
 #!/usr/bin/env python3
-"""Check the committed Cabin assets in public/cabin/ against their manifest. Needs only Python 3.
-
-    python3 tools/cabin/verify.py [directory, default public/cabin]
-
-Exits non-zero and lists every failure when the assets are not what the page expects.
-"""
 import hashlib, json, os, re, struct, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -22,14 +16,12 @@ def read(name):
     with open(os.path.join(DIR, name), 'rb') as f: return f.read()
 
 def versioned(name, stem, ext):
-    """the name is <stem>.<first 8 hex of the content's SHA-256>.<ext>, and the file exists"""
     if not check(os.path.isfile(os.path.join(DIR, name)), f'{name}: listed in the manifest but missing'): return None
     data = read(name); digest = hashlib.sha256(data).hexdigest()[:8]
     check(name == f'{stem}.{digest}.{ext}', f'{name}: name does not carry its content hash (expected {stem}.{digest}.{ext})')
     return data
 
 def avif_size(data, name):
-    """(width, height) of an AVIF image, read from its first image spatial extents (ispe) box"""
     if not check(data[4:8] == b'ftyp' and data[8:12] == b'avif', f'{name}: not an AVIF file'): return None
     at = data.find(b'ispe')
     if not check(at > 0 and len(data) >= at + 16, f'{name}: no image size (ispe) box'): return None

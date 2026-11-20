@@ -12,9 +12,6 @@ import {
 } from '@/lib/open-source';
 import { cn } from '@/lib/utils';
 
-// The full Open Source list on /open-source: Ecosystem filters, the current
-// page of rows, and page numbers. `?eco=&page=` picks the view in the browser,
-// so the page itself stays prerendered; the prerendered HTML is All, page 1.
 export function OpenSourceList({ rows }: { rows: Row[] }) {
   return (
     <Suspense fallback={<ListBody view={viewOpenSourceList(rows, {})} />}>

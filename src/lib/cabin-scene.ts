@@ -1,13 +1,3 @@
-// The Cabin as a three.js scene mounted into an element: the baked cabin, its
-// materials' surface tiles projected on them, drawn over a placeholder street
-// that drives past, in day or night lighting, the
-// orbit round a point above the Cabin Screen, the seat backs hidden while the
-// eye is near them, the screen's drawing and its presses, the zoom to the
-// screen and back, and the resolution steps.
-// Browser-only; the home page loads it on demand.
-// See docs/adr/0011-home-is-a-cabin-over-a-reading-home.md and
-// docs/map/home-room.md.
-
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -42,26 +32,15 @@ import type { HomeSectionId } from './home';
 import type { Language } from './i18n';
 
 export type CabinEvents = {
-  // The Cabin is drawn and passed its frame test.
   onReady: () => void;
-  // What the view shows: whether it is zoomed to the Cabin Screen, and the
-  // screen's tab. Reported whenever either changes after the frame test has
-  // passed; until then the view is at the seat and nothing is reported.
   onView: (view: CabinView) => void;
-  // The Cabin ran over the frame budget at its lowest resolution.
   onFrameTestFailed: () => void;
-  // The Cabin could not start: no context, an asset that did not load, or a
-  // cabin the orbit does not fit.
   onError: (error: unknown) => void;
-  // An item leading to a page of this site was pressed on the Cabin Screen.
   onNavigate: (href: string) => void;
 };
 
 export type CabinView = { zoomed: boolean; tab: HomeSectionId };
 
-// What the Cabin starts with. `tab` set means it opens zoomed to the Cabin
-// Screen on that tab. `fontFamily` is the CSS font family the screen's text
-// is drawn in.
 export type CabinStart = {
   lighting: Lighting;
   language: Language;
@@ -71,15 +50,10 @@ export type CabinStart = {
 
 export type Cabin = {
   zoomOut: () => void;
-  // Opens `tab` on the Cabin Screen and zooms to it.
   showTab: (tab: HomeSectionId) => void;
   setLighting: (lighting: Lighting) => void;
-  // The language of the Identity Statement on the Cabin Screen.
   setLanguage: (language: Language) => void;
   dispose: () => void;
-  // Where the cameras are now: the gap between the drawn camera and the
-  // controls' camera and the drawn camera's distance to the orbit's centre, in
-  // metres, and the controls' orbit angles, in radians.
   probe: () => {
     gap: number;
     distance: number;
@@ -88,46 +62,29 @@ export type Cabin = {
     zoomed: boolean;
     pixelRatio: number;
     tab: HomeSectionId;
-    // The lighting drawn now; it trails `setLighting` while a lightmap loads.
     lighting: Lighting;
-    // How long the last drawing of the Cabin Screen took, in milliseconds,
-    // without the texture upload.
     paintCost: number;
-    // The Cabin Screen's pressable zones, each with the client position of
-    // its centre.
     zones: { key: string; x: number; y: number }[];
   };
 };
 
 const ASSETS = '/cabin/';
 
-// The box the eye stays in, in the cabin's metres: between the door cards,
-// under the headliner, behind the dashboard, above the seat cushions and
-// ahead of the partition behind the seats. It reaches into the seat backs.
 const EYE_BOUNDS: Bounds = {
   min: { x: -0.61, y: 0.82, z: -0.6 },
   max: { x: 0.61, y: 1.26, z: 0.07 },
 };
 
-// The meshes holding each seat's back, headrest and headrest posts.
 const SEAT_BACKS = ['SeatBackLeft', 'SeatBackRight'];
-// A seat back is hidden while the eye is nearer than this to its bounding
-// box, in metres.
 const SEAT_BACK_NEAR = 0.12;
 
-// How far the orbit's centre, the point the view turns round and looks at
-// from the seat, stands above the Cabin Screen's centre, in metres.
 const ORBIT_LIFT = 0.21;
 
-// The seat view the Cabin opens on, as orbit angles in radians.
 const HOME_AZIMUTH = -0.3881;
 const HOME_POLAR = 1.4802;
 
 const FOV = 60;
-// The least horizontal field of view, in degrees: a narrow (portrait) view
-// widens its vertical field until it sees at least this much across.
 const MIN_FOV_ACROSS = 40;
-// How much of the view's height and width the Cabin Screen fills when zoomed.
 const ZOOM_FILL_HEIGHT = 0.62;
 const ZOOM_FILL_WIDTH = 0.9;
 const ZOOM_MS = 900;
@@ -180,39 +137,28 @@ type LoadedLightmap = { texture: THREE.Texture; scale: number };
 type LightMaps = { own: LoadedLightmap; ambient?: LoadedLightmap };
 
 const PIXEL_RATIOS = [1.5, 1.25, 1];
-// A frame's cost above which the resolution steps down, and above which, at
-// the lowest step, the frame test fails. In milliseconds.
 const STEP_DOWN_MS = 20;
 const FRAME_BUDGET_MS = 1000 / 30;
-// The frame test at each resolution: frames skipped, then frames timed.
 const TEST_WARM_FRAMES = 3;
 const TEST_FRAMES = 12;
-// After the test: one frame in this many is timed, over this many timings.
 const GOVERNOR_EVERY = 30;
 const GOVERNOR_FRAMES = 5;
 
-// How far the cameras see, in metres: past the sky, which is a sphere of
-// SKY_RADIUS round the eye.
 const SKY_RADIUS = 900;
 const FAR = 1500;
-// Where the reflection of the outside is captured from: a seated passenger's
-// eye height, between the two seats.
 const REFLECTION_EYE = new THREE.Vector3(0, 1.15, -0.2);
 
-const SPEED = 13.9; // m/s
-// The car's speed at animation time `now`, in m/s.
+const SPEED = 13.9;
 const speedAt = (now: number) => SPEED * (1 + 0.15 * Math.sin(now / 9000));
-// How often the Cabin Screen's clock and speed are read again, in ms.
 const STATUS_EVERY = 1000;
-const SEGMENT = 360; // the street repeats over this length, in metres
-const ROAD_CENTRE = -1.75; // x of the road's centre line; the car is at x = 0
+const SEGMENT = 360;
+const ROAD_CENTRE = -1.75;
 
 const median = (values: number[]) => [...values].sort((a, b) => a - b)[values.length >> 1];
 
 type Street = {
   scene: THREE.Scene;
   sky: THREE.Mesh;
-  // Moves everything `distance` metres toward the car.
   advance: (distance: number) => void;
   setLighting: (lighting: Lighting) => void;
 };
@@ -225,13 +171,9 @@ type Placed = {
   sy: number;
   sz: number;
   color?: string;
-  // Speed along the road relative to the street, in m/s; negative is oncoming.
   speed?: number;
 };
 
-// The placeholder street: sky, road, pavements, and rows of buildings, trees,
-// lamps and oncoming cars that wrap over SEGMENT. It is in no lighting until
-// `setLighting` is called.
 function buildStreet(): Street {
   const scene = new THREE.Scene();
   const fog = new THREE.Fog('#000000', 1, 2);
@@ -427,9 +369,6 @@ function buildStreet(): Street {
 // environment's diffuse light and that turn the lightmap's texel into light.
 const ENVIRONMENT_DIFFUSE = 'iblIrradiance += getIBLIrradiance( geometryNormal );';
 const LIGHTMAP_LIGHT = 'vec3 lightMapIrradiance = lightMapTexel.rgb * lightMapIntensity;';
-// The chunk without the environment's diffuse light, and with the lightmap's
-// texel decoded from sRGB twice more (the `srgb-thrice` encoding, whose third
-// curve the texture's own sRGB decoding undoes).
 const CABIN_LIGHT_CHUNK = THREE.ShaderChunk.lights_fragment_maps
   .replace(ENVIRONMENT_DIFFUSE, '')
   .replace(
@@ -454,9 +393,6 @@ const BEGIN_VERTEX_LINE = '#include <begin_vertex>';
 type ShaderParts = { vertexShader: string; fragmentShader: string; uniforms: Record<string, { value: unknown }> };
 const PROJECTED_VARYINGS = 'varying vec3 vProjectedPosition;\nvarying vec3 vProjectedNormal;';
 
-// Makes a material draw its colour map projected along the three world axes,
-// `repeat` tiles to a metre, each projection weighed by how squarely the
-// surface faces its axis.
 function projectedMap(shader: ShaderParts, repeat: number) {
   shader.uniforms.projectedRepeat = { value: repeat };
   shader.vertexShader = shader.vertexShader
@@ -478,7 +414,6 @@ function projectedMap(shader: ShaderParts, repeat: number) {
     );
 }
 
-// Frees every geometry, material and texture under `root`.
 function disposeTree(root: THREE.Object3D) {
   root.traverse((object) => {
     const mesh = object as THREE.Mesh;
@@ -493,17 +428,13 @@ function disposeTree(root: THREE.Object3D) {
   });
 }
 
-// Mounts the Cabin into `container` and starts loading it. Everything it
-// reports comes through `events`; nothing is thrown.
 export function mountCabin(container: HTMLElement, events: CabinEvents, from: CabinStart): Cabin {
   let disposed = false;
   let stop = () => {};
   let zoomOut = () => {};
-  // What was last asked for; `show` brings the running scene in line with it.
   let lighting = from.lighting;
   let language = from.language;
   let tab: HomeSectionId = from.tab ?? 'about';
-  // The Cabin passed its frame test; until then a zoom asked for waits.
   let ready = false;
   let zoomAsked = from.tab !== null;
   const show = { lighting: () => {}, language: () => {}, tab: () => {} };
@@ -549,7 +480,6 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     const canvas = renderer.domElement;
     let frame = 0;
-    // What to undo, in the order it was set up; `stop` undoes it backwards.
     const cleanups: (() => void)[] = [
       () => {
         renderer.forceContextLoss();
@@ -643,7 +573,6 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
       .catch(fail);
 
     function run(cabin: THREE.Object3D, firstLighting: Lighting, firstLight: LightMaps) {
-      // The Cabin Screen's drawing, kept as the canvas its texture reads.
       const screenCanvas = document.createElement('canvas');
       screenCanvas.width = SCREEN_WIDTH;
       screenCanvas.height = SCREEN_HEIGHT;
@@ -681,7 +610,6 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
         screenTexture.needsUpdate = true;
         paintCost = performance.now() - began;
       };
-      // Text drawn before its font arrived is drawn again once it has.
       const repaint = () => {
         painted = '';
         paint();
@@ -712,7 +640,6 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
           screen = mesh;
           return;
         }
-        // The side glass keeps its own tinted, see-through material and has no lightmap.
         if (mesh.name === 'Glass') return;
         for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
           const standard = material as THREE.MeshStandardMaterial;
@@ -730,8 +657,6 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
       });
       cabinScene.add(cabin);
 
-      // Each material the manifest gives a surface texture, drawn with it
-      // once its tile has loaded; the Cabin does not wait for the tiles.
       const tiles = new Map<string, Promise<THREE.Texture>>();
       const tile = (file: string) => {
         let loaded = tiles.get(file);
@@ -820,7 +745,6 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
       const screenSize = screenBox.getSize(new THREE.Vector3());
       const orbit = fitOrbit(EYE_BOUNDS, target);
 
-      // The controls own `camera`; the scene is drawn from `view`.
       const camera = new THREE.PerspectiveCamera(FOV, 1, 0.02, FAR);
       camera.position
         .setFromSphericalCoords(
@@ -859,7 +783,6 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
       window.addEventListener('resize', resize);
       cleanups.push(() => window.removeEventListener('resize', resize));
 
-      // Pulls `eye` back toward the orbit's centre until it is inside EYE_BOUNDS.
       const keepInside = (eye: THREE.Vector3) => {
         let keep = 1;
         for (const axis of ['x', 'y', 'z'] as const) {
@@ -872,7 +795,6 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
         if (keep < 1) eye.sub(target).multiplyScalar(Math.max(0.05, keep)).add(target);
       };
 
-      // Zoom runs from 0 (the seat) to 1 (in front of the Cabin Screen).
       let zoomed = false;
       let zoom = 0;
       let zoomFrom = 0;
@@ -913,8 +835,6 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
 
       const ray = new THREE.Raycaster();
       const pointer = new THREE.Vector2();
-      // Where the pointer is: its press point, and the zone of the Cabin
-      // Screen under it.
       const pointAt = (event: PointerEvent): { press: PressPoint; zone: Zone | null } => {
         const bounds = canvas.getBoundingClientRect();
         pointer.set(
@@ -967,7 +887,6 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
       canvas.addEventListener('pointermove', move);
       canvas.addEventListener('pointerleave', leave);
 
-      // A frame's cost is timed with the GPU made to finish it.
       const gl = renderer.getContext();
       const pixel = new Uint8Array(4);
       let testing = true;
@@ -980,7 +899,6 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
         costs = [];
         skip = TEST_WARM_FRAMES;
       };
-      // Returns false when the frame test failed and the Cabin stopped.
       const timed = (cost: number) => {
         if (skip > 0) {
           skip--;

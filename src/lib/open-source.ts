@@ -1,33 +1,3 @@
-// The "Open Source" section — Packages: reusable libraries/plugins/crates that
-// other developers install and build on, and Families: groups of Packages built
-// to be used together. See GLOSSARY.md ("Package", "Family", "Ecosystem") and
-// docs/adr/0003-minimal-project-card.md + 0004-open-source-vs-projects.md +
-// 0006-link-packages-to-registry.md + 0007-package-families.md.
-//
-// Source of truth: Kihyun's GitHub profile README (the curated list he
-// maintains). Order here mirrors that README (ecosystem clusters: Flutter,
-// then Rust, then npm).
-//
-// Rules:
-// - Hand-curated, not auto-pulled from GitHub. Order is curation, never a sort.
-// - A card shows exactly two things: `name` and `ecosystem`. No description.
-// - A card carries two links: `href` — the package's registry page (pub.dev /
-//   crates.io / npm), where install info, docs, and version live — and `repo`,
-//   its source on GitHub. `repo` is written out, never derived from `name`:
-//   packages in a monorepo (justpdf, justerm) share one repository.
-//   See docs/adr/0009-package-rows-link-registry-and-repo.md.
-// - A Package belongs to at most one Family, and is still declared exactly once
-//   in `packages` — a Family references its members by name.
-// - `uses` / `exampleUses` name the other Packages here that a Package, or only
-//   its example app, depends on. Third-party packages are never listed. pub.dev
-//   shows only the Package's own pubspec; example-app uses come from
-//   example/pubspec.yaml in its repo. They feed the Dependency Map and nothing
-//   else — rows never show them.
-//   See docs/adr/0010-dependency-map.md.
-
-// Shown under the section heading. Lifted from GLOSSARY.md's definition of
-// Package so the site and the glossary say the same thing in the same words.
-// English-only, per ADR-0001's default for any new text.
 export const openSourceLede =
   'Libraries, plugins, and crates other developers install and build on';
 
@@ -36,27 +6,19 @@ export type Ecosystem = 'Flutter' | 'Rust' | 'npm';
 export type Package = {
   name: string;
   ecosystem: Ecosystem;
-  // Registry page.
   href: string;
-  // GitHub repository.
   repo: string;
-  // Dependencies: Packages here that installing this one pulls in.
   uses?: string[];
-  // Example Dependencies: Packages here that only its example app uses.
   exampleUses?: string[];
 };
 
-// A group of Packages built to be used together. `members` names entries in
-// `packages`, in the order they should be read (entry point first).
 export type Family = {
-  // URL segment: /open-source/<slug>
   slug: string;
   name: string;
   members: string[];
 };
 
 export const packages: Package[] = [
-  // Flutter — pub.dev
   { name: 'flutter_bin', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_bin', repo: 'https://github.com/kihyun1998/flutter_bin' },
   { name: 'x509_cert_store', ecosystem: 'Flutter', href: 'https://pub.dev/packages/x509_cert_store', repo: 'https://github.com/kihyun1998/x509_cert_store' },
   { name: 'flutter_alone', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_alone', repo: 'https://github.com/kihyun1998/flutter_alone' },
@@ -86,7 +48,6 @@ export const packages: Package[] = [
   { name: 'flutter_example_template', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_example_template', repo: 'https://github.com/kihyun1998/flutter_example_template', uses: ['flutter_syntax_highlight', 'flutter_smooth_wheel_scroll'] },
   { name: 'flutter_smooth_wheel_scroll', ecosystem: 'Flutter', href: 'https://pub.dev/packages/flutter_smooth_wheel_scroll', repo: 'https://github.com/kihyun1998/flutter_smooth_wheel_scroll' },
 
-  // Rust — crates.io
   { name: 'justpdf', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf', repo: 'https://github.com/kihyun1998/justpdf', uses: ['justpdf-core', 'justpdf-render'] },
   { name: 'justpdf-core', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-core', repo: 'https://github.com/kihyun1998/justpdf', uses: ['justbig2', 'justjp2'] },
   { name: 'justpdf-render', ecosystem: 'Rust', href: 'https://crates.io/crates/justpdf-render', repo: 'https://github.com/kihyun1998/justpdf', uses: ['justpdf-core'] },
@@ -99,7 +60,6 @@ export const packages: Package[] = [
   { name: 'justerm-core', ecosystem: 'Rust', href: 'https://crates.io/crates/justerm-core', repo: 'https://github.com/kihyun1998/justerm' },
   { name: 'justsftp', ecosystem: 'Rust', href: 'https://crates.io/crates/justsftp', repo: 'https://github.com/kihyun1998/justsftp' },
 
-  // npm
   { name: 'justpdf-compress-wasm', ecosystem: 'npm', href: 'https://www.npmjs.com/package/@kihyun1998/justpdf-compress-wasm', repo: 'https://github.com/kihyun1998/justpdf' },
   { name: 'justerm-web', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-web', repo: 'https://github.com/kihyun1998/justerm', uses: ['justerm-renderer', 'justerm-wasm-decode'] },
   { name: 'justerm-renderer', ecosystem: 'npm', href: 'https://www.npmjs.com/package/justerm-renderer', repo: 'https://github.com/kihyun1998/justerm' },
@@ -111,9 +71,6 @@ export const families: Family[] = [
   {
     slug: 'justpdf',
     name: 'justpdf',
-    // The library first, then its sub-crates, the CLI, the codecs it
-    // consumes, and the wasm build. A Family named after its flagship
-    // Package is fine — see docs/adr/0007-package-families.md.
     members: [
       'justpdf',
       'justpdf-core',
@@ -130,23 +87,18 @@ export const families: Family[] = [
   {
     slug: 'justerm',
     name: 'justerm',
-    // Entry point first, then its consumers.
     members: ['justerm-core', 'justerm-web', 'justerm-renderer', 'justerm-wasm-decode'],
   },
 ];
 
-// One row of the Open Source list: either a standalone Package or a Family
-// standing in for its members.
 export type PackageRow = Package & { kind: 'package' };
 
 export type FamilyRow = {
   kind: 'family';
   slug: string;
   name: string;
-  // Internal, unlike a Package row — a Family has no registry page.
   href: string;
   memberCount: number;
-  // Every Ecosystem its members span, by first appearance in `packages`.
   ecosystems: Ecosystem[];
 };
 
@@ -160,17 +112,12 @@ export type ResolvedFamily = {
 
 const URL_SAFE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-// Fixed routes under /open-source/ that a Family page would shadow.
 const RESERVED_SLUGS = new Set(['dependencies']);
 
 function indexByName(allPackages: Package[]): Map<string, Package> {
   return new Map(allPackages.map((entry) => [entry.name, entry]));
 }
 
-// Resolving a Family's members is also how membership is checked: a name that
-// isn't in the catalogue has nothing to resolve to. Keeping the two together
-// means there is one lookup, and one error, rather than a validation pass and a
-// resolution pass that can disagree.
 function resolveMembers(
   family: Family,
   byName: Map<string, Package>,
@@ -186,9 +133,6 @@ function resolveMembers(
   });
 }
 
-// Curation mistakes are invisible in the arrays above and would ship as a
-// silently wrong list, so they throw. `openSourceRows` is derived at module
-// load and every page imports it, which makes these build-time failures.
 function assertFamiliesAreWellFormed(
   byName: Map<string, Package>,
   allFamilies: Family[],
@@ -232,10 +176,6 @@ function assertFamiliesAreWellFormed(
   }
 }
 
-// A Family appears where curation put its first member and its members drop out
-// of the flat list, so declared order still governs everything. A Family
-// therefore outranks the Ecosystem clustering it sits inside — see
-// docs/adr/0007-package-families.md.
 export function deriveOpenSourceRows(
   allPackages: Package[] = packages,
   allFamilies: Family[] = families,
@@ -280,14 +220,10 @@ export function deriveOpenSourceRows(
   return rows;
 }
 
-// The list every Open Source surface renders. Derived once, at module load.
 export const openSourceRows: OpenSourceRow[] = deriveOpenSourceRows();
 
-// Rows per page on /open-source. A Family counts as one row, as on home.
 export const OPEN_SOURCE_PAGE_SIZE = 15;
 
-// What /open-source shows for one `?eco=&page=`: the filters with their
-// counts, and the current page of the chosen one. `ecosystem` undefined is All.
 export type OpenSourceListView = {
   rows: OpenSourceRow[];
   ecosystem: Ecosystem | undefined;
@@ -299,9 +235,6 @@ export type OpenSourceListView = {
 const rowEcosystems = (row: OpenSourceRow): Ecosystem[] =>
   row.kind === 'package' ? [row.ecosystem] : row.ecosystems;
 
-// A filter narrows the list without reordering it, and a Family sits under
-// every Ecosystem its members span. The query comes straight from the URL, so
-// nothing here throws: an unknown Ecosystem is All, and a page is clamped.
 export function viewOpenSourceList(
   rows: OpenSourceRow[],
   query: { eco?: string | null; page?: string | null },
@@ -348,9 +281,6 @@ export function resolveFamily(
   };
 }
 
-// One edge of the Dependency Map: `from` uses `to`. `installed` is a
-// Dependency, pulled in with the Package; `example` is an Example Dependency,
-// used only by its example app. See docs/adr/0010-dependency-map.md.
 export type DependencyLink = {
   from: string;
   to: string;
@@ -358,16 +288,11 @@ export type DependencyLink = {
 };
 
 export type DependencyGraph = {
-  // Every Package on either end of a link, in declared order.
   packages: Package[];
   links: DependencyLink[];
-  // Every other Package, in declared order. Drawn around the graph, apart.
   unconnected: Package[];
 };
 
-// Like Family membership, a wrong name here would silently drop an edge from
-// the map, so it throws — at build time, since `dependencyGraph` is derived at
-// module load.
 export function deriveDependencyGraph(
   allPackages: Package[] = packages,
 ): DependencyGraph {
@@ -411,5 +336,4 @@ export function deriveDependencyGraph(
   };
 }
 
-// The graph the Dependency Map renders. Derived once, at module load.
 export const dependencyGraph: DependencyGraph = deriveDependencyGraph();
