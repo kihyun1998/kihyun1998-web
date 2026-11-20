@@ -290,11 +290,13 @@ box('dashUnder', (2 * TUB_X, TUB_Y1 - DASH_Y - 0.06, 0.02), (0, (TUB_Y1 + DASH_Y
 # ---------- dashboard: a deep flat deck to the windscreen, and the thin layered slab across it ----------
 # in front of the door cards' front end the deck widens behind the A-pillar's base, under the cowl's ends
 DECK_X = 0.72
+DECK_RISE, DECK_RUN, DECK_THICK = 0.03, WS_Y - DASH_Y - 0.05, 0.02
+def deck_z(y): return DASH_Z - 0.003 + DECK_RISE * (y - DASH_Y - 0.05) / DECK_RUN
 rows = []
-for y in [DASH_Y + 0.05 + (WS_Y - DASH_Y - 0.05) * j / 8 for j in range(8)] + [DOOR_Y1 + 0.006, WS_Y]:
+for y in [DASH_Y + 0.05 + DECK_RUN * j / 8 for j in range(8)] + [DOOR_Y1 + 0.006, WS_Y]:
     half = DECK_X if y > DOOR_Y1 + 0.003 else DOOR_X - inset(y) - 0.005
-    rows.append([(half * (i / 6 - 1), y, DASH_Z - 0.003 + 0.03 * (y - DASH_Y - 0.05) / (WS_Y - DASH_Y - 0.05)) for i in range(13)])
-grid('dashDeck', rows, 'dash', 0, 0.02)
+    rows.append([(half * (i / 6 - 1), y, deck_z(y)) for i in range(13)])
+grid('dashDeck', rows, 'dash', 0, DECK_THICK)
 # the slab: its layered profile swept straight across at full height, the vent slot closing in a round end before
 # each end of the slab, and each end closed by a cap whose rim rounds over with radius SLAB_R
 SLAB_X, SLAB_R = 0.606, 0.025              # the slab's end, against the door card, and the radius of the cap's rim
@@ -537,6 +539,27 @@ for s in (-1, 1):
     sweep(f'doorBar{s}', [(s * (card_x(y, z) - 0.003), y, z) for y, z in bar], [(-0.003, -0.0015), (0.003, -0.0015), (0.003, 0.0015), (-0.003, 0.0015)],
           lambda p, t, s=s: Vector((-s, 0, 0)), 'ambient')
 
+M['grille'] = mat('grille', '#262626', 0.7)
+GRILLE_Y, GRILLE_Z = 0.95, 0.47
+GRILLE_FACE, GRILLE_N = 0.07, 48
+GRILLE_RINGS = [(0.0, 0.003), (0.035, 0.003), (GRILLE_FACE, 0.003), (0.074, 0.006), (0.080, 0.006), (0.085, -0.002)]
+for s in (-1, 1):
+    bm = bmesh.new(); n = GRILLE_N; rings = []
+    for r, lift in GRILLE_RINGS:
+        pts = [(GRILLE_Y + r * math.cos(2 * math.pi * k / n), GRILLE_Z + r * math.sin(2 * math.pi * k / n)) for k in range(n if r else 1)]
+        rings.append([bm.verts.new((s * (card_x(y, z) - lift), y, z)) for y, z in pts])
+    for k in range(n): bm.faces.new((rings[0][0], rings[1][k], rings[1][(k + 1) % n])).material_index = 0
+    for i, (r0, r1) in enumerate(zip(rings[1:], rings[2:]), 1):
+        for k in range(n): bm.faces.new((r0[k], r1[k], r1[(k + 1) % n], r0[(k + 1) % n])).material_index = int(GRILLE_RINGS[i][0] >= GRILLE_FACE)
+    bm.normal_update()
+    for f in bm.faces:
+        if f.normal.x * s > 0: f.normal_flip()
+    o = finish(mesh_from(f'grille{s}', bm), 'grille'); o.data.materials.append(M['darkGrey'])
+DECK_GRILLE_Y = (1.37, WS_Y - 0.015)
+box('deckGrille', (2 * (DOOR_X - inset(DOOR_Y1) - 0.03), DECK_GRILLE_Y[1] - DECK_GRILLE_Y[0], 0.004),
+    (0, sum(DECK_GRILLE_Y) / 2, deck_z(sum(DECK_GRILLE_Y) / 2) + DECK_THICK / 2 + 0.0005), 'grille', 0.0015,
+    rot=Matrix.Rotation(math.atan2(DECK_RISE, DECK_RUN), 4, 'X').to_quaternion())
+
 # ---------- headliner front: two sun visors, the overhead console with the dome lights and stop button, the camera pod ----------
 for s in (-1, 1): box(f'visor{s}', (0.42, 0.17, 0.03), (s * 0.30, 0.69, 1.345), 'lightGrey', 0.012, 1, Matrix.Rotation(math.radians(18), 4, 'X').to_quaternion())
 box('overhead', (0.16, 0.25, 0.04), (0, 0.67, 1.352), 'lightGrey', 0.012, 1)
@@ -609,7 +632,7 @@ RIGHT = camera('right', (0.5876, 0.1471, 1.14), ORBIT_C, 60, 'VERTICAL')
 OUTSIDE = camera('outside', (-3.0, 5.4, 1.7), (0.1, 1.5, 0.75), 34)      # the front three-quarter view of the maker's exterior image
 SHOTS = [(HOME, 1470, 729), (LEFT, 1470, 729), (RIGHT, 1470, 729), (FRONT, 1280, 960), (DOOR, 1280, 720), (CORNER, 1280, 960),
          (RDOOR, 1280, 720), (SIDE, 1600, 800), (DASHEND, 1280, 720), (OUTSIDE, 1280, 960)]
-LEFT_SIDE = ('door-1', 'release-1', 'glass-1', 'rail-1', 'bpillar-1')
+LEFT_SIDE = ('door-1', 'release-1', 'glass-1', 'rail-1', 'bpillar-1', 'grille-1', 'doorBar-1')
 SEAT_BACKS = ('back-', 'back0', 'head-', 'head0', 'post', 'partition')   # left out of the front view
 SEATS = ('cush', 'back', 'head', 'post', 'base', 'console', 'armrest', 'armPost', 'cup', 'winSwitch')   # left out of the side view
 PAGE_VIEWS = (HOME, LEFT, RIGHT)
@@ -882,10 +905,9 @@ for d in prefs.devices: d.use = (d.type == prefs.compute_device_type)
 print('DEVICE', prefs.compute_device_type, [d.name for d in prefs.devices if d.use])
 sc.cycles.device = 'GPU'; sc.view_settings.view_transform = 'AgX'
 world = bpy.data.worlds.new('w'); sc.world = world
-# day: an even, slightly cool sky all round, a wide soft sun high in front, the road under the car
-bg = world.node_tree.nodes['Background']; bg.inputs['Color'].default_value = (0.95, 0.97, 1.0, 1); bg.inputs['Strength'].default_value = 1.0
+bg = world.node_tree.nodes['Background']; bg.inputs['Color'].default_value = (0.95, 0.97, 1.0, 1); bg.inputs['Strength'].default_value = 0.6
 sun = bpy.data.objects.new('sun', bpy.data.lights.new('sun', 'SUN')); sc.collection.objects.link(sun)
-sun.data.energy = 1.5; sun.data.angle = math.radians(60); sun.data.color = (1.0, 0.96, 0.9)
+sun.data.energy = 4.0; sun.data.angle = math.radians(1.5); sun.data.color = (1.0, 0.96, 0.9)
 sun.rotation_euler = (math.radians(-35), 0, math.radians(20))
 bm = bmesh.new(); bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=60)
 road = finish(mesh_from('road', bm), 'road', keep=False, smooth=False)

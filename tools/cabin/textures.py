@@ -1,17 +1,11 @@
-# The Cabin's surface textures, generated from seeded noise: no image from elsewhere goes into them. Run in headless
-# Blender (for its numpy and image writer):
-#   blender -b --factory-startup --python textures.py
-# Writes into $CABIN_OUT (or out/ beside this file):
-#   tex_<kind>.png    for each kind of surface in KINDS, a seamless grey tile, sRGB, linear mean near MEAN, that the base
-#                     colour of the materials using it is multiplied by
-#   textures.json     each kind's tile size in metres, and which kind each Cabin material uses
-# compress.py encodes them for the page, which projects each tile along the three world axes (no texture UVs).
-import bpy, os, json
+import bpy, os, json, glob, hashlib, urllib.error, urllib.request
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.environ.get('CABIN_OUT') or os.path.join(HERE, 'out')
 os.makedirs(OUT, exist_ok=True)
+for stale in glob.glob(os.path.join(OUT, 'tex_*.png')) + [os.path.join(OUT, 'textures.json')]:
+    if os.path.isfile(stale): os.remove(stale)
 MEAN = 0.8      # the tile's linear mean
 
 def band(rng, n, longest, shortest, stretch=1.0):
@@ -62,29 +56,57 @@ def stipple(rng, n):
     f1, _, _ = cells(rng, n, 160)
     return 1 + 0.03 * unit(-f1) + 0.02 * band(rng, n, 4, 1.5) + 0.015 * band(rng, n, n / 4, n / 16)
 
-def carpet(rng, n):
-    """cut pile: dense tufts of uneven height and a coarser patchiness"""
-    tuft = band(rng, n, 5, 1.5)
-    return 1 + 0.12 * tuft + 0.05 * band(rng, n, n / 8, n / 32)
-
 # kind: (generator, tile size in metres, pixels across, seed)
-KINDS = {'leather': (leather, 0.25, 512, 48), 'felt': (felt, 0.2, 512, 49), 'stipple': (stipple, 0.15, 512, 50),
-         'carpet': (carpet, 0.1, 256, 51)}
+KINDS = {'leather': (leather, 0.25, 512, 48), 'felt': (felt, 0.2, 512, 49), 'stipple': (stipple, 0.15, 512, 50)}
+PHOTOS = {'carpet': {'url': 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/dirty_carpet/dirty_carpet_diff_2k.jpg',
+                     'sha256': '6337d3ef1a11ca8bea2d31b86da15a65f10ae92c7f3345fae62924bae194f6c0', 'tile': 0.6, 'px': 512}}
 # Cabin material: the kind of surface it is drawn with
 MATERIALS = {'leather': 'leather', 'insert': 'felt', 'headliner': 'felt', 'carpet': 'carpet',
              'dash': 'stipple', 'dashBand': 'stipple', 'darkGrey': 'stipple', 'midGrey': 'stipple',
              'lightGrey': 'stipple', 'frame': 'stipple'}
 
+def linear(x): return np.where(x <= 0.04045, x / 12.92, np.power((x + 0.055) / 1.055, 2.4))
+
 def srgb(x): return np.where(x <= 0.0031308, x * 12.92, 1.055 * np.power(np.maximum(x, 1e-9), 1 / 2.4) - 0.055)
+
+TILES = {}
+
+def write(kind, tile, colour):
+    """save a linear grey tile, its rows in Blender's order (bottom up), as tex_<kind>.png"""
+    n = colour.shape[0]; TILES[kind] = tile
+    img = bpy.data.images.new(f'tex_{kind}', n, n, alpha=False); img.colorspace_settings.name = 'Non-Color'
+    buf = np.ones((n, n, 4), dtype=np.float32); buf[:, :, :3] = srgb(colour)[:, :, None]
+    img.pixels.foreach_set(buf.ravel())
+    img.filepath_raw = os.path.join(OUT, f'tex_{kind}.png'); img.file_format = 'PNG'; img.save()
 
 for kind, (make, tile, n, seed) in KINDS.items():
     colour = make(np.random.default_rng(seed), n)
-    colour = np.clip(colour * MEAN / colour.mean(), 0, 1)
-    img = bpy.data.images.new(f'tex_{kind}', n, n, alpha=False); img.colorspace_settings.name = 'Non-Color'
-    buf = np.ones((n, n, 4), dtype=np.float32); buf[:, :, :3] = srgb(colour)[::-1, :, None]   # Blender's rows run bottom up
-    img.pixels.foreach_set(buf.ravel())
-    img.filepath_raw = os.path.join(OUT, f'tex_{kind}.png'); img.file_format = 'PNG'; img.save()
+    write(kind, tile, np.clip(colour * MEAN / colour.mean(), 0, 1)[::-1])
     print(f'WROTE tex_{kind}.png')
+
+def sha256_of(path):
+    with open(path, 'rb') as f: return hashlib.sha256(f.read()).hexdigest()
+
+def fetch(url, sha256):
+    path = os.path.join(OUT, url.rsplit('/', 1)[1])
+    if not (os.path.isfile(path) and sha256_of(path) == sha256):
+        request = urllib.request.Request(url, headers={'User-Agent': 'cabin-textures'})
+        try:
+            with urllib.request.urlopen(request, timeout=60) as r: data = r.read()
+        except (urllib.error.URLError, TimeoutError) as e: raise SystemExit(f'{url}: {e}')
+        if hashlib.sha256(data).hexdigest() != sha256: raise SystemExit(f'{url}: SHA-256 does not match')
+        with open(path, 'wb') as f: f.write(data)
+    return path
+
+for kind, photo in PHOTOS.items():
+    url, n = photo['url'], photo['px']
+    src = bpy.data.images.load(fetch(url, photo['sha256'])); src.colorspace_settings.name = 'Non-Color'
+    w, h = src.size; px = np.empty(w * h * 4, dtype=np.float32); src.pixels.foreach_get(px)
+    lum = linear(px.reshape(h, w, 4)[:, :, :3]) @ np.array([0.2126, 0.7152, 0.0722])
+    f = w // n; lum = lum[:n * f, :n * f].reshape(n, f, n, f).mean((1, 3))
+    rel = lum / lum.mean()
+    write(kind, photo['tile'], np.clip(rel * min(MEAN, 1 / np.percentile(rel, 99.9)), 0, 1))
+    print(f'WROTE tex_{kind}.png from {url}')
 with open(os.path.join(OUT, 'textures.json'), 'w') as f:
-    json.dump({'kinds': {k: v[1] for k, v in KINDS.items()}, 'materials': MATERIALS}, f, indent=2); f.write('\n')
+    json.dump({'kinds': TILES, 'materials': MATERIALS}, f, indent=2); f.write('\n')
 print('DONE')
