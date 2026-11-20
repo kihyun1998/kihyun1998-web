@@ -56,9 +56,11 @@ python3 tools/cabin/bake_kaggle.py 1024 64    # a quick look
 ```
 
 Pushes `cabin.py` to the private GPU kernel named in `bake_kaggle.py`, waits for the run, and
-downloads `cabin.glb`, `light_day.hdr`, `light_night.hdr`, the ten views as Cycles day renders (`day_home.png` and
+downloads `cabin.glb`, `light_day.hdr`, `light_night.hdr`, `light_ambient.hdr`, the ten views as Cycles day renders (`day_home.png` and
 so on) and the run log into `out/`, and removes the denoised lightmaps of the bake before. Each HDR holds the baked
-light as Cycles computed it, linear, with no colour curve. Both lightmaps use the Cabin's second UV set; the **Cabin Screen** is a separate object
+light as Cycles computed it, linear, with no colour curve. `light_ambient.hdr` is the night's ambient layer alone: the
+footwell light under the dash, the door bars and the dash strip, baked in white with every other light off, which the
+page multiplies by the ambient colour and strength and adds to the night lightmap. All three lightmaps use the Cabin's second UV set; the **Cabin Screen** is a separate object
 named `Screen` and is not baked, and the side glass is a separate object named `Glass`, left out of the bake and exported
 with a see-through material. Each seat's back, headrest and headrest posts are baked as part of the Cabin and then split
 off it into `SeatBackLeft` and `SeatBackRight`, which keep the Cabin's lightmap UVs and read the same lightmaps.
@@ -69,7 +71,7 @@ off it into `SeatBackLeft` and `SeatBackRight`, which keep the Cabin's lightmap 
 $BLENDER -b --factory-startup --python tools/cabin/denoise.py
 ```
 
-Writes `out/light_day_dn.hdr` and `out/light_night_dn.hdr`.
+Writes `out/light_day_dn.hdr`, `out/light_night_dn.hdr` and `out/light_ambient_dn.hdr`.
 
 ## 5. Make the surface textures
 
@@ -91,10 +93,11 @@ $BLENDER -b --factory-startup --python tools/cabin/compress.py
 Replaces the files in `public/cabin/`:
 
 - `cabin.<hash>.glb`: the scene with Draco mesh compression. The page needs three.js's `DRACOLoader`.
-- `light-day.<hash>.avif`, `light-night.<hash>.avif`: each lightmap's linear light divided by `scale`, with the sRGB
+- `light-day.<hash>.avif`, `light-night.<hash>.avif`, `light-ambient.<hash>.avif`: each lightmap's linear light divided by `scale`, with the sRGB
   curve applied three times, in 8 bits (the manifest's `encoding`, `srgb-thrice`), as AVIF at quality 90. The page loads it as an sRGB texture
   with `flipY = false` on UV channel 1, decodes the sampled value from sRGB twice more in the shader, and multiplies
-  the lightmap intensity by `scale`. Why three times: `docs/map/home-room.md`, "The lightmaps hold linear light"; why AVIF: "The lightmap goes to what the seat sees".
+  the lightmap intensity by `scale`. At night it adds the ambient layer, decoded the same way, times its `scale`, the
+  night's level, the ambient strength and the ambient colour (`AMBIENT_COLOUR` in `src/lib/cabin-scene.ts`). Why three times: `docs/map/home-room.md`, "The lightmaps hold linear light"; why AVIF: "The lightmap goes to what the seat sees".
 - `tex-<kind>.<hash>.avif`: each surface tile, as AVIF at quality 80. The page loads it as an sRGB texture and draws it
   projected along the three world axes, `1 / tile` tiles to a metre (the GLB has no texture UVs), on the materials
   `surfaces` names, their base colour divided by the tile's `mean`.
@@ -112,7 +115,7 @@ python3 tools/cabin/verify.py
 
 Checks that every file in `public/cabin/` is the one the manifest names, that each name matches its content, that
 the GLB is Draco-compressed with a `Cabin` mesh and `SeatBackLeft` and `SeatBackRight` meshes carrying lightmap UVs
-and a separate `Screen` mesh, that the two
-lightmaps are AVIF of the same size, with `srgb-thrice` named as each one's encoding in the manifest, and that each surface
+and a separate `Screen` mesh, that the lightmaps are day and night, and the ambient layer where the bake has it, all
+AVIF of the same size, with `srgb-thrice` named as each one's encoding in the manifest, and that each surface
 tile is AVIF with a positive tile size and a mean in (0, 1], is used by some surface, and that every surface is a
 material of the GLB and names a listed tile. Then commit `tools/cabin/` and `public/cabin/` together.

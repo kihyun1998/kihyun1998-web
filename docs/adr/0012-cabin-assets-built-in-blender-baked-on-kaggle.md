@@ -22,6 +22,10 @@ Measurements and traps are in `docs/map/home-room.md`.
 - *Baking in CI*: ties the build to a GPU quota and credentials.
 - *Hand modelling in Blender's UI*: not reviewable or repeatable in a pull request; the script is.
 
+## Note (2026-11-19, #51)
+
+The premise "the Mac cannot bake in reasonable time" no longer holds once the Metal kernels are compiled: a whole bake at 2048 px × 256 samples took 518 s on the M2 (`docs/map/home-room.md`, "Baking the cabin in Blender"). The first run's compile is still over 24 minutes. Whether bakes stay on Kaggle was not revisited.
+
 ## Consequences
 
 - Changing a shape means running the script, re-baking, and committing new assets together; asset URLs carry a version so browsers do not keep the old file.

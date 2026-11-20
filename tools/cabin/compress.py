@@ -1,6 +1,6 @@
 # Compress the baked Cabin into the files the site serves. Run in headless Blender:
 #   blender -b --factory-startup --python compress.py [-- <lightmap AVIF quality, default 90> [<texture AVIF quality, default 80>]]
-# Reads cabin.glb, light_day_dn.hdr and light_night_dn.hdr from $CABIN_OUT (or out/ beside this file), and the surface
+# Reads cabin.glb, light_day_dn.hdr, light_night_dn.hdr and light_ambient_dn.hdr from $CABIN_OUT (or out/ beside this file), and the surface
 # textures textures.py wrote there, and writes into public/cabin/:
 #   cabin.<hash>.glb          the same scene with Draco mesh compression
 #   light-<tag>.<hash>.avif   the lightmap's linear light / scale, the sRGB curve applied three times, in 8 bits
@@ -62,7 +62,7 @@ def geometry():
     return publish(tmp, 'cabin', 'glb')
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
-manifest = {'lightmaps': {tag: lightmap(tag) for tag in ('day', 'night')}}
+manifest = {'lightmaps': {tag: lightmap(tag) for tag in ('day', 'night', 'ambient')}}
 with open(os.path.join(SRC, 'textures.json')) as f: textures = json.load(f)
 manifest['textures'] = {kind: texture(kind, tile) for kind, tile in textures['kinds'].items()}
 manifest['surfaces'] = textures['materials']

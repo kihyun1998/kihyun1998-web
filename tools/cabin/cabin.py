@@ -1,8 +1,8 @@
-# The Cabin: geometry, Workbench previews, day and night lightmap bakes, GLB export. Run in headless Blender:
+# The Cabin: geometry, Workbench previews, day, night and ambient lightmap bakes, GLB export. Run in headless Blender:
 #   blender -b --factory-startup --python cabin.py -- wb                          ten Workbench previews (no Cycles), MEASURE lines
 #   blender -b --factory-startup --python cabin.py -- uv [size]                    the lightmap's UVs laid out (no Cycles), MEASURE lines
-#   blender -b --factory-startup --python cabin.py -- bake [size] [samples]       Cycles: ten day renders, day + night
-#                                                                                 diffuse lightmaps, cabin.glb
+#   blender -b --factory-startup --python cabin.py -- bake [size] [samples]       Cycles: ten day renders, day, night
+#                                                                                 and ambient diffuse lightmaps, cabin.glb
 # Output goes to $CABIN_OUT, or to out/ beside this file.
 # Blender axes: x right, y forward, z up. glTF export maps (x, y, z) -> three.js (x, z, -y).
 import bpy, bmesh, math, mathutils, time, os, sys
@@ -34,8 +34,8 @@ M = {
     'lightGrey': mat('lightGrey', '#7a7a7a', 0.65), 'headliner': mat('headliner', '#bcbcbc', 0.95),
     'dash': mat('dash', '#484848', 0.6), 'dashBand': mat('dashBand', '#787878', 0.6), 'darkGrey': mat('darkGrey', '#4a4a4a', 0.55), 'midGrey': mat('midGrey', '#6c6c6c', 0.45),
     'leather': mat('leather', '#434343', 0.42), 'carpet': mat('carpet', '#565656', 1.0),
-    'piano': mat('piano', '#111111', 0.15, 0.3), 'strip': mat('strip', '#d9d2c6', 0.4, emit='#ffd9a8'),
-    'dome': mat('dome', '#e8e6e1', 0.5, emit='#fff1dc'), 'red': mat('red', '#7d1d1d', 0.4),
+    'piano': mat('piano', '#111111', 0.15, 0.3), 'strip': mat('strip', '#d9d2c6', 0.4, emit='#ffffff'),
+    'dome': mat('dome', '#e8e6e1', 0.5, emit='#fff1dc'), 'ambient': mat('ambient', '#d0d4dc', 0.4, emit='#ffffff'), 'red': mat('red', '#7d1d1d', 0.4),
     'screen': mat('screen', '#08080a', 0.2),
     'body': mat('body', '#6f5c3c', 0.35, 0.3), 'glass': mat('glass', '#1a1f1e', 0.05, alpha=0.25),
     'road': mat('road', '#a8a8a8', 0.9),
@@ -420,6 +420,7 @@ PAN_DEPTH = 0.022                                          # how far the panel s
 BLK_TOP_RISE = 0.012                                       # the width of the block's rise along its top edge
 LEAN = 0.3                                                 # how far the panel's ends lean rearward per metre of height
 SHOULDER_Y, SHOULDER_D = 0.945, 0.045                      # the shoulder's rear face beside the dash end, and how far it stands in
+BAR_REAR, BAR_FRONT = 0.07, BLK_FRONT - 0.08
 def door_base(y, z):
     """the card's plain section at y: how far out its face stands at height z"""
     b = belt(y)
@@ -532,6 +533,9 @@ for s in (-1, 1):
     me.normals_split_custom_set_from_vertices(normals)
     ry = BLK_FRONT - 0.09; rz = blk_edges(ry)[1] + 0.004
     box(f'release{s}', (0.010, 0.034, 0.016), (s * (card_x(ry, rz - 0.025) - 0.004), ry, rz), 'piano', 0.004)
+    bar = [(y, blk_edges(y)[1] + 0.008) for y in (BAR_REAR + (BAR_FRONT - BAR_REAR) * i / 40 for i in range(41))]
+    sweep(f'doorBar{s}', [(s * (card_x(y, z) - 0.003), y, z) for y, z in bar], [(-0.003, -0.0015), (0.003, -0.0015), (0.003, 0.0015), (-0.003, 0.0015)],
+          lambda p, t, s=s: Vector((-s, 0, 0)), 'ambient')
 
 # ---------- headliner front: two sun visors, the overhead console with the dome lights and stop button, the camera pod ----------
 for s in (-1, 1): box(f'visor{s}', (0.42, 0.17, 0.03), (s * 0.30, 0.69, 1.345), 'lightGrey', 0.012, 1, Matrix.Rotation(math.radians(18), 4, 'X').to_quaternion())
@@ -906,16 +910,23 @@ def bake(tag):
     for m in cabin.data.materials:
         for n in [n for n in m.node_tree.nodes if n.type in ('TEX_IMAGE', 'UVMAP')]: m.node_tree.nodes.remove(n)
 
+AMBIENT = {'foot': 3.0, 'bar': 10.0, 'strip': 6.0}
+def emission(k, strength): M[k].node_tree.nodes['Principled BSDF'].inputs['Emission Strength'].default_value = strength
+
 bake('day')
-# night: a dim blue sky, no sun, the dash strip and dome lights on, a warm street lamp passing on the right
 bg.inputs['Color'].default_value = (0.25, 0.35, 0.6, 1); bg.inputs['Strength'].default_value = 0.05; sun.hide_render = True
-M['strip'].node_tree.nodes['Principled BSDF'].inputs['Emission Strength'].default_value = 6
-M['dome'].node_tree.nodes['Principled BSDF'].inputs['Emission Strength'].default_value = 1.5
+emission('dome', 1.5)
 lamp = bpy.data.objects.new('street', bpy.data.lights.new('street', 'AREA')); sc.collection.objects.link(lamp)
 lamp.data.energy = 120; lamp.data.size = 1.0; lamp.data.color = (1.0, 0.75, 0.45); lamp.location = (3.0, 0.6, 4.0)
 lamp.rotation_euler = (Vector((0, SEAT_Y + 0.3, 0.8)) - lamp.location).to_track_quat('-Z', 'Y').to_euler()
 bake('night')
-for k in ('strip', 'dome'): M[k].node_tree.nodes['Principled BSDF'].inputs['Emission Strength'].default_value = 0
+bg.inputs['Strength'].default_value = 0.0; emission('dome', 0); lamp.hide_render = True
+emission('strip', AMBIENT['strip']); emission('ambient', AMBIENT['bar'])
+foot = bpy.data.objects.new('footLight', bpy.data.lights.new('footLight', 'AREA')); sc.collection.objects.link(foot)
+foot.data.shape = 'RECTANGLE'; foot.data.size = 2 * (SLAB_X - 0.12); foot.data.size_y = 0.012; foot.data.energy = AMBIENT['foot']
+foot.location = (0, DASH_Y + 0.03, DASH_LOW - 0.006); foot.rotation_euler = (math.radians(-20), 0, 0)
+bake('ambient')
+for k in ('strip', 'ambient'): emission(k, 0)
 
 # each seat's back split off the baked Cabin: a mesh of its own with the Cabin's lightmap UVs
 seat_backs = []

@@ -4,7 +4,7 @@
     python3 tools/cabin/bake_kaggle.py [size, default 2048] [samples, default 256]
 
 Pushes cabin.py inside a script kernel, waits for the run, and downloads cabin.glb, light_day.hdr,
-light_night.hdr, the Cycles day renders and the run log into $CABIN_OUT (or out/ beside this file).
+light_night.hdr, light_ambient.hdr, the Cycles day renders and the run log into $CABIN_OUT (or out/ beside this file).
 Denoised lightmaps (light_*_dn.hdr) left there by an earlier bake are removed.
 The Kaggle CLI is `kaggle` on PATH, or the path in $KAGGLE.
 """
@@ -74,10 +74,11 @@ while True:
     break
 
 print('\n'.join(l for l in lines if l.startswith(('SETUP_S', 'DEVICE', 'TIME', 'DONE', 'TOTAL_S'))))
-missing = [n for n in ('cabin.glb', 'light_day.hdr', 'light_night.hdr') if not os.path.isfile(os.path.join(OUT, n))]
+TAGS = ('day', 'night', 'ambient')
+missing = [n for n in ('cabin.glb', *(f'light_{tag}.hdr' for tag in TAGS)) if not os.path.isfile(os.path.join(OUT, n))]
 if missing or not any(l.startswith('DONE') for l in lines):
     sys.exit(f'the bake did not finish (missing: {", ".join(missing) or "nothing"}); see the log in {OUT}')
-for tag in ('day', 'night'):
+for tag in TAGS:
     stale = os.path.join(OUT, f'light_{tag}_dn.hdr')
     if os.path.isfile(stale): os.remove(stale)
 print('downloaded to', OUT)

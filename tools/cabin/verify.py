@@ -82,7 +82,8 @@ for material, kind in surfaces.items():
     if materials is not None: check(material in materials, f'manifest: surface {material} is no material of {geo_name}')
 
 sizes = {}
-check(set(manifest['lightmaps']) == {'day', 'night'}, f'manifest: lightmaps are {sorted(manifest["lightmaps"])}, expected day and night')
+check(set(manifest['lightmaps']) in ({'day', 'night'}, {'day', 'night', 'ambient'}),
+      f'manifest: lightmaps are {sorted(manifest["lightmaps"])}, expected day and night, and ambient where the bake has the layer')
 for tag, entry in manifest['lightmaps'].items():
     name = entry['file']; listed.add(name)
     data = versioned(name, f'light-{tag}', 'avif')
@@ -91,8 +92,8 @@ for tag, entry in manifest['lightmaps'].items():
     if data is None: continue
     check(len(data) <= MAX_LIGHTMAP_BYTES, f'{name}: {len(data)} bytes, over {MAX_LIGHTMAP_BYTES}')
     sizes[tag] = avif_size(data, name)
-if len(sizes) == 2 and all(sizes.values()):
-    check(sizes['day'] == sizes['night'], f'lightmaps differ in size: day {sizes["day"]}, night {sizes["night"]}')
+if len(sizes) > 1 and all(sizes.values()):
+    check(len(set(sizes.values())) == 1, 'lightmaps differ in size: ' + ', '.join(f'{tag} {size}' for tag, size in sizes.items()))
 
 for name in sorted(n for n in os.listdir(DIR) if not n.startswith('.')):
     check(name in listed, f'{name}: in the directory but not in the manifest (a stale version?)')
