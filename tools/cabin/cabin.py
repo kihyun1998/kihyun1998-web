@@ -632,7 +632,7 @@ RIGHT = camera('right', (0.5876, 0.1471, 1.14), ORBIT_C, 60, 'VERTICAL')
 OUTSIDE = camera('outside', (-3.0, 5.4, 1.7), (0.1, 1.5, 0.75), 34)      # the front three-quarter view of the maker's exterior image
 SHOTS = [(HOME, 1470, 729), (LEFT, 1470, 729), (RIGHT, 1470, 729), (FRONT, 1280, 960), (DOOR, 1280, 720), (CORNER, 1280, 960),
          (RDOOR, 1280, 720), (SIDE, 1600, 800), (DASHEND, 1280, 720), (OUTSIDE, 1280, 960)]
-LEFT_SIDE = ('door-1', 'release-1', 'glass-1', 'rail-1', 'bpillar-1', 'grille-1')
+LEFT_SIDE = ('door-1', 'release-1', 'glass-1', 'rail-1', 'bpillar-1', 'grille-1', 'doorBar-1')
 SEAT_BACKS = ('back-', 'back0', 'head-', 'head0', 'post', 'partition')   # left out of the front view
 SEATS = ('cush', 'back', 'head', 'post', 'base', 'console', 'armrest', 'armPost', 'cup', 'winSwitch')   # left out of the side view
 PAGE_VIEWS = (HOME, LEFT, RIGHT)
