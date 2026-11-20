@@ -8,6 +8,7 @@ What every page shares: the root layout (`src/app/layout.tsx`), the header and i
 - **The layout states `alternates: { canonical: '/' }`** so Google never has to guess which host variant to index.
 - **The AdSense publisher id is written in two places, the layout's loader `src` and `public/ads.txt`, and cannot be one.** `ads.txt` is plain text served to crawlers and cannot import a constant; inside TypeScript there is only the one.
 - **`BLOG_URL` and `GITHUB_URL` are the nav area's two outbound links**, and the home page's Blog and Online sections list them too.
+- **`/ko` and `/en` and everything under them redirect permanently to the same path on blog.kihyun1998.com** (`next.config.ts`). The blog lived on this apex under those paths before it moved; Google still held the old URLs and Search Console reported 14 of them as 404s. Paths map 1:1 across the move, so the whole locale subtree is forwarded and the ranking signals follow. Next keeps the query string, which the `?from=...` share links already in the wild need.
 
 ## The AdSense loader
 
