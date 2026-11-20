@@ -39,13 +39,14 @@ parts, which the page hides while the eye is near them.
 $BLENDER -b --factory-startup --python tools/cabin/cabin.py -- uv
 ```
 
-Joins the Cabin and lays out its lightmap UVs as the bake does, without Cycles (about two minutes), and prints `MEASURE`
+Joins the Cabin and lays out its lightmap UVs as the bake does, without Cycles (about three and a half minutes on an M2), and prints `MEASURE`
 lines: how much of the map is covered, how much of the Cabin's area the page's eye never sees and what share of the map
 that takes, and for each part its area, the share of it that is seen, the nearest eye that sees it, its share of the
 map and its texel size. What the eye can see comes from the orbit the page fits in `EYE_BOX` round `ORBIT_C` with `ORBIT_MARGIN`, the zoom
-to the screen (`ZOOM_D`), the opening view's angles in `page_eyes` and `SEAT_BACK_NEAR`, all copies of the page's; keep
-them the same. Why the map is shared this
-way: `docs/map/home-room.md`, "The lightmap goes to what the seat sees".
+to the screen (`ZOOM_D`), the opening view's angles in `page_eyes`, `SEAT_BACK_NEAR`, the view's `FOV` and `MIN_FOV_ACROSS`
+and the sway (`SWAY`), all copies of the page's; keep them the same. `ASPECTS` is the range of window shapes the eyes
+cover. Why the map is shared this way: `docs/map/home-room.md`, "The lightmap goes to what the seat sees" and "The
+layout gets the room #32 left".
 
 ## 3. Bake on Kaggle
 
