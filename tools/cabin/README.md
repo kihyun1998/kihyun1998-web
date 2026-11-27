@@ -57,7 +57,7 @@ python3 tools/cabin/bake_kaggle.py            # 2048 px, 256 samples
 python3 tools/cabin/bake_kaggle.py 1024 64    # a quick look
 ```
 
-Pushes `cabin.py` to the private GPU kernel named in `bake_kaggle.py`, waits for the run, and
+Pushes `cabin.py` to the private GPU kernel `kihyun1998/cabin-bake` (`KERNEL` in `bake_kaggle.py`), waits for the run, and
 downloads `cabin.glb`, `light_day.hdr`, `light_night.hdr`, `light_ambient.hdr`, the ten views as Cycles day renders (`day_home.png` and
 so on) and the run log into `out/`, and removes the denoised lightmaps of the bake before. Each HDR holds the baked
 light as Cycles computed it, linear, with no colour curve. `light_ambient.hdr` is the night's ambient layer alone: the
@@ -66,6 +66,18 @@ page multiplies by the ambient colour and strength and adds to the night lightma
 named `Screen` and is not baked, and the side glass is a separate object named `Glass`, left out of the bake and exported
 with a see-through material. Each seat's back, headrest and headrest posts are baked as part of the Cabin and then split
 off it into `SeatBackLeft` and `SeatBackRight`, which keep the Cabin's lightmap UVs and read the same lightmaps.
+
+The script stops at once, with the Kaggle CLI's output, when the push does not report `successfully pushed`. It polls
+every 10 s and waits up to 3 hours for the run to start while Kaggle holds it `QUEUED`, then up to 20 minutes from when
+it shows `RUNNING`; while Kaggle still shows only an earlier version's finished run, it waits 20 minutes from the push.
+A failed `kaggle kernels status` or `kaggle kernels output` is tried again after 15, 30, 60 and 120 s, each retry
+printed with the first line of the error. The script exits non-zero with a message when a call still fails after that
+(the Kaggle CLI's own output), when a wait runs out, when the run ends `ERROR` or cancelled (with the kernel's `FAIL`
+lines, if any, or at once if it ended before its log showed this run), or when the bake's files are missing.
+
+The kernel downloads Blender 5.3.0 for Linux and Blender's published SHA-256 list for 5.3.0 beside it, and stops the
+run, printing `FAIL` with both hashes and removing the tarball, unless the tarball's SHA-256 is the one listed for it;
+on a match it prints `BLENDER_SHA256` and the hash.
 
 The kernel runs `cabin.py -- bake [size] [samples]` (2048 and 256 by default). The same command bakes on this machine,
 on the first of OptiX, CUDA or Metal that Blender finds, and writes the ten Cycles day renders, the three lightmaps and
