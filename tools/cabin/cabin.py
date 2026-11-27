@@ -544,7 +544,7 @@ OUTSIDE = camera('outside', (-3.0, 5.4, 1.7), (0.1, 1.5, 0.75), 34)
 SHOTS = [(HOME, 1470, 729), (LEFT, 1470, 729), (RIGHT, 1470, 729), (FRONT, 1280, 960), (DOOR, 1280, 720), (CORNER, 1280, 960),
          (RDOOR, 1280, 720), (SIDE, 1600, 800), (DASHEND, 1280, 720), (OUTSIDE, 1280, 960)]
 LEFT_SIDE = ('door-1', 'release-1', 'glass-1', 'rail-1', 'bpillar-1', 'grille-1', 'doorBar-1')
-SEAT_BACKS = ('back-', 'back0', 'head-', 'head0', 'post', 'partition')
+SEAT_BACKS_AND_PARTITION = ('back-', 'back0', 'head-', 'head0', 'post', 'partition')
 SEATS = ('cush', 'back', 'head', 'post', 'base', 'console', 'armrest', 'armPost', 'cup', 'winSwitch')
 PAGE_VIEWS = (HOME, LEFT, RIGHT)
 SEAT_BACK_NEAR = 0.12
@@ -563,7 +563,7 @@ def shoot(prefix):
         for o in bpy.data.objects:
             if o.name in LEFT_SIDE: o.hide_render = c in (DOOR, SIDE)
             if o.name.startswith(SEATS): o.hide_render = (c is SIDE)
-            if o.name.startswith(SEAT_BACKS): o.hide_render = c in (FRONT, SIDE) or o.name in near
+            if o.name.startswith(SEAT_BACKS_AND_PARTITION): o.hide_render = c in (FRONT, SIDE) or o.name in near
             if o.name == 'body': o.hide_render = (c is SIDE)
         sc.camera = c; sc.render.resolution_x, sc.render.resolution_y = w, h
         sc.render.filepath = os.path.join(OUT, f'{prefix}_{c.name}.png')

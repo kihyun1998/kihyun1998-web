@@ -2,8 +2,7 @@ import { Cabin } from '@/components/cabin';
 import { IdentityStatement } from '@/components/identity-statement';
 import { Section, LinkRow } from '@/components/lists';
 import { OpenSourceRow } from '@/components/open-source-row';
-import { screenContent } from '@/lib/cabin-screen';
-import { HOME_LIMIT } from '@/lib/home';
+import { HOME_LIMIT, homeLinks, sectionTitle } from '@/lib/home';
 import { openSourceLede, openSourceRows } from '@/lib/open-source';
 import { projects, projectsLede } from '@/lib/projects';
 
@@ -15,7 +14,7 @@ export default function Home() {
       </div>
 
       <Section
-        title="Open Source"
+        title={sectionTitle('open-source')}
         lede={openSourceLede}
         seeAllHref="/open-source"
       >
@@ -25,7 +24,7 @@ export default function Home() {
       </Section>
 
       <Section
-        title="Projects"
+        title={sectionTitle('projects')}
         lede={projectsLede}
         seeAllHref="/projects"
         bordered
@@ -40,16 +39,13 @@ export default function Home() {
         ))}
       </Section>
 
-      {(['blog', 'online'] as const).map((id) => {
-        const { title, items } = screenContent(id, 'en');
-        return (
-          <Section key={id} title={title} bordered>
-            {items.map((item) => (
-              <LinkRow key={item.href} href={item.href} name={item.name} meta={item.meta} />
-            ))}
-          </Section>
-        );
-      })}
+      {(['blog', 'online'] as const).map((id) => (
+        <Section key={id} title={sectionTitle(id)} bordered>
+          {homeLinks[id].map((link) => (
+            <LinkRow key={link.href} href={link.href} name={link.name} meta={link.meta} />
+          ))}
+        </Section>
+      ))}
 
       <Cabin />
     </>

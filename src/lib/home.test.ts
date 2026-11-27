@@ -1,5 +1,24 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { shownSection } from './home';
+import { homeLinks, sectionTitle, shownSection } from './home';
+import { BLOG_URL, GITHUB_URL } from './site';
+
+describe('the home sections', () => {
+  it('each have the title the nav shows', () => {
+    expect(sectionTitle('open-source')).toBe('Open Source');
+    expect(sectionTitle('online')).toBe('Online');
+  });
+
+  it('give the one link to the Blog in the Blog section', () => {
+    expect(homeLinks.blog).toEqual([{ name: 'blog.kihyun1998.com', href: BLOG_URL }]);
+  });
+
+  it('give the GitHub profile and the Blog in the Online section', () => {
+    expect(homeLinks.online).toEqual([
+      { name: 'GitHub', meta: 'kihyun1998', href: GITHUB_URL },
+      { name: 'Blog', meta: 'blog.kihyun1998.com', href: BLOG_URL },
+    ]);
+  });
+});
 
 describe('shownSection', () => {
   afterEach(() => shownSection.set(null));
