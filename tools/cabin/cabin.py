@@ -145,7 +145,7 @@ DOOR_Y0, DOOR_Y1 = BACK + 0.06, WS_Y - 0.06
 def belt(y):
     return 0.94 + 0.12 * (GLASS_Y - y) / 1.46
 HDR_Y = 0.80
-DOOR_X = 0.77
+DOOR_X, SILL_X = 0.77, 0.79
 def inset(y):
     t = min(1.0, max(0.0, (y - 0.35) / 0.65)); return 0.16 * t * t * (3 - 2 * t)
 EYE = (0.0, 0.25, 1.15)
@@ -243,12 +243,12 @@ for f in bm.faces:
 finish(mesh_from('tub', bm), 'carpet', 0, 0)
 box('dashUnder', (2 * TUB_X, TUB_Y1 - DASH_Y - 0.06, 0.02), (0, (TUB_Y1 + DASH_Y + 0.06) / 2, DASH_LOW + 0.012), 'darkGrey', 0.004)
 
-DECK_X = 0.72
+DECK_X, DECK_ON_SILL = 0.72, 0.01
 DECK_RISE, DECK_RUN, DECK_THICK = 0.03, WS_Y - DASH_Y - 0.05, 0.02
 def deck_z(y): return DASH_Z - 0.003 + DECK_RISE * (y - DASH_Y - 0.05) / DECK_RUN
 rows = []
 for y in [DASH_Y + 0.05 + DECK_RUN * j / 8 for j in range(8)] + [DOOR_Y1 + 0.006, WS_Y]:
-    half = DECK_X if y > DOOR_Y1 + 0.003 else DOOR_X - inset(y) - 0.005
+    half = DECK_X if y > DOOR_Y1 + 0.003 else SILL_X - inset(y) + DECK_ON_SILL
     rows.append([(half * (i / 6 - 1), y, deck_z(y)) for i in range(13)])
 grid('dashDeck', rows, 'dash', 0, DECK_THICK)
 SLAB_X, SLAB_R = 0.606, 0.025
@@ -367,7 +367,7 @@ SHOULDER_Y, SHOULDER_D = 0.945, 0.045
 BAR_REAR, BAR_FRONT = 0.07, BLK_FRONT - 0.08
 def door_base(y, z):
     b = belt(y)
-    return interp([(FLOOR, 0.79), (FLOOR + 0.05, 0.752), (FLOOR + 0.12, 0.746), (b - 0.10, 0.764), (b - 0.035, DOOR_X), (b, 0.79)], z)
+    return interp([(FLOOR, 0.79), (FLOOR + 0.05, 0.752), (FLOOR + 0.12, 0.746), (b - 0.10, 0.764), (b - 0.035, DOOR_X), (b, SILL_X)], z)
 def rbox(y, z, y0, y1, z0, z1, r):
     r = min(r, (z1 - z0) / 2, (y1 - y0) / 2)
     qy = max(y0 + r - y, y - (y1 - r), 0.0); qz = max(z0 + r - z, z - (z1 - r), 0.0)
@@ -482,6 +482,9 @@ DECK_GRILLE_Y = (1.37, WS_Y - 0.015)
 box('deckGrille', (2 * (DOOR_X - inset(DOOR_Y1) - 0.03), DECK_GRILLE_Y[1] - DECK_GRILLE_Y[0], 0.004),
     (0, sum(DECK_GRILLE_Y) / 2, deck_z(sum(DECK_GRILLE_Y) / 2) + DECK_THICK / 2 + 0.0005), 'grille', 0.0015,
     rot=Matrix.Rotation(math.atan2(DECK_RISE, DECK_RUN), 4, 'X').to_quaternion())
+TRIM_Y, TRIM_X, TRIM_H = (DECK_GRILLE_Y[1] - 0.002, WS_Y), 0.64, 0.006
+ribbon('windscreenTrim', *[[(TRIM_X * (i / 16 - 1), y, deck_z(y) + DECK_THICK / 2) for i in range(33)] for y in TRIM_Y], 'lightGrey', TRIM_H,
+       face=(0, WS_Y, 2.0))
 
 for s in (-1, 1): box(f'visor{s}', (0.42, 0.17, 0.03), (s * 0.30, 0.69, 1.345), 'lightGrey', 0.012, 1, Matrix.Rotation(math.radians(18), 4, 'X').to_quaternion())
 box('overhead', (0.16, 0.25, 0.04), (0, 0.67, 1.352), 'lightGrey', 0.012, 1)
