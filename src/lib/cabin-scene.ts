@@ -6,6 +6,7 @@ import { DRACOLoader, DRACO_GLTF_CONFIG } from 'three/addons/loaders/DRACOLoader
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import manifest from '../../public/cabin/manifest.json';
 import {
+  LAYERS,
   fitOrbit,
   fovFor,
   isNear,
@@ -15,9 +16,12 @@ import {
   orbitAnglesAt,
   surfaceTexture,
   type Bounds,
+  type CabinLight,
+  type Layer,
   type SurfaceTextureEntry,
   type Lighting,
   type LightmapTag,
+  type Pressable,
   type PressPoint,
 } from './cabin-rules';
 import {
@@ -38,12 +42,14 @@ export type CabinEvents = {
   onFrameTestFailed: () => void;
   onError: (error: unknown) => void;
   onNavigate: (href: string) => void;
+  onDomeLights: (on: boolean) => void;
 };
 
 export type CabinView = { zoomed: boolean; tab: HomeSectionId };
 
 export type CabinStart = {
   lighting: Lighting;
+  domeLights: boolean;
   language: Language;
   tab: HomeSectionId | null;
   fontFamily: string;
@@ -53,6 +59,7 @@ export type Cabin = {
   zoomOut: () => void;
   showTab: (tab: HomeSectionId) => void;
   setLighting: (lighting: Lighting) => void;
+  setDomeLights: (on: boolean) => void;
   setLanguage: (language: Language) => void;
   dispose: () => void;
   probe?: () => CabinProbe;
@@ -67,8 +74,10 @@ export type CabinProbe = {
   pixelRatio: number;
   tab: HomeSectionId;
   lighting: Lighting;
+  domeLights: boolean;
   paintCost: number;
   zones: { key: string; x: number; y: number }[];
+  lenses: { x: number; y: number }[];
 };
 
 const ASSETS = '/cabin/';
@@ -97,7 +106,8 @@ const LOOKS = {
     reflection: 0.4,
     ambient: 0,
     ambientGlow: 0,
-    dome: 0,
+    domeLight: 4,
+    domeGlow: 0.6,
     top: '#4f8fd8',
     mid: '#cfe0ef',
     bot: '#8b8d86',
@@ -115,7 +125,8 @@ const LOOKS = {
     reflection: 0.15,
     ambient: 1,
     ambientGlow: 1.6,
-    dome: 0.6,
+    domeLight: 4,
+    domeGlow: 0.6,
     top: '#050817',
     mid: '#1b2347',
     bot: '#0e0f14',
@@ -136,7 +147,12 @@ const LAMP_GLOW = '#ffd9a6';
 type LightmapEntry = { file: string; scale: number; encoding: string };
 const LIGHTMAPS: Record<LightmapTag, LightmapEntry> = manifest.lightmaps;
 type LoadedLightmap = { texture: THREE.Texture; scale: number };
-type LightMaps = { own: LoadedLightmap; ambient?: LoadedLightmap };
+type LightMaps = { own: LoadedLightmap; layers: Partial<Record<Layer, LoadedLightmap>> };
+
+const LAYER_LIGHTS: Record<Layer, { colour: string; strength: 'ambient' | 'domeLight' }> = {
+  ambient: { colour: AMBIENT_COLOUR, strength: 'ambient' },
+  dome: { colour: DOME_GLOW, strength: 'domeLight' },
+};
 
 const PIXEL_RATIOS = [1.5, 1.25, 1];
 const STEP_DOWN_MS = 20;
@@ -371,21 +387,30 @@ function buildStreet(): Street {
 // environment's diffuse light and that turn the lightmap's texel into light.
 const ENVIRONMENT_DIFFUSE = 'iblIrradiance += getIBLIrradiance( geometryNormal );';
 const LIGHTMAP_LIGHT = 'vec3 lightMapIrradiance = lightMapTexel.rgb * lightMapIntensity;';
+const layerUniforms = (layer: Layer) => {
+  const name = `cabin${layer[0].toUpperCase()}${layer.slice(1)}`;
+  return { map: `${name}Map`, light: `${name}Light` };
+};
 const CABIN_LIGHT_CHUNK = THREE.ShaderChunk.lights_fragment_maps
   .replace(ENVIRONMENT_DIFFUSE, '')
   .replace(
     LIGHTMAP_LIGHT,
-    `vec3 lightMapIrradiance = sRGBTransferEOTF( sRGBTransferEOTF( lightMapTexel ) ).rgb * lightMapIntensity
-      + sRGBTransferEOTF( sRGBTransferEOTF( texture2D( cabinAmbientMap, vLightMapUv ) ) ).rgb * cabinAmbientLight;`,
+    `vec3 lightMapIrradiance = sRGBTransferEOTF( sRGBTransferEOTF( lightMapTexel ) ).rgb * lightMapIntensity${LAYERS.map((layer) => {
+      const { map, light } = layerUniforms(layer);
+      return `\n      + sRGBTransferEOTF( sRGBTransferEOTF( texture2D( ${map}, vLightMapUv ) ) ).rgb * ${light}`;
+    }).join('')};`,
   );
+const CABIN_LIGHT_UNIFORMS = LAYERS.map((layer) => {
+  const { map, light } = layerUniforms(layer);
+  return `uniform sampler2D ${map};\nuniform vec3 ${light};\n`;
+}).join('');
 
-type AmbientLayer = { cabinAmbientMap: { value: THREE.Texture }; cabinAmbientLight: { value: THREE.Color } };
+type LayerUniforms = Record<string, { value: THREE.Texture } | { value: THREE.Color }>;
 
-function cabinLight(shader: ShaderParts, ambient: AmbientLayer) {
-  Object.assign(shader.uniforms, ambient);
+function cabinLight(shader: ShaderParts, layers: LayerUniforms) {
+  Object.assign(shader.uniforms, layers);
   shader.fragmentShader =
-    'uniform sampler2D cabinAmbientMap;\nuniform vec3 cabinAmbientLight;\n' +
-    shader.fragmentShader.replace('#include <lights_fragment_maps>', CABIN_LIGHT_CHUNK);
+    CABIN_LIGHT_UNIFORMS + shader.fragmentShader.replace('#include <lights_fragment_maps>', CABIN_LIGHT_CHUNK);
 }
 
 // The lines in three.js's standard material shaders that apply the colour map
@@ -487,6 +512,7 @@ function cabinScreen(
 
 function dressCabin(cabin: THREE.Object3D, screenTexture: THREE.Texture) {
   const lit: THREE.MeshStandardMaterial[] = [];
+  const domes: THREE.Mesh[] = [];
   let screen: THREE.Mesh | null = null;
   cabin.traverse((object) => {
     const mesh = object as THREE.Mesh;
@@ -500,51 +526,68 @@ function dressCabin(cabin: THREE.Object3D, screenTexture: THREE.Texture) {
     if (mesh.name === 'Glass') return;
     for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
       lit.push(material as THREE.MeshStandardMaterial);
+      if (material.name === 'dome') domes.push(mesh);
     }
   });
   if (!screen) throw new Error('The cabin has no mesh named Screen.');
+  if (domes.length === 0) throw new Error('The cabin has no mesh drawn in the dome material.');
   const screenMesh: THREE.Mesh = screen;
   const seatBacks = SEAT_BACKS.map((name) => {
     const part = cabin.getObjectByName(name);
     if (!part) throw new Error(`The cabin has no mesh named ${name}.`);
     return { part, box: new THREE.Box3().setFromObject(part) };
   });
-  return { lit, screen: screenMesh, seatBacks };
+  return { lit, screen: screenMesh, domes, seatBacks };
 }
 
-function lightmapLoader(renderer: THREE.WebGLRenderer, life: Life) {
-  const loading: Partial<Record<LightmapTag, Promise<LoadedLightmap>>> = {};
-  const lightmap = (tag: LightmapTag) => {
+function textureLoader(renderer: THREE.WebGLRenderer, life: Life) {
+  const loading = new Map<string, Promise<THREE.Texture>>();
+  return (file: string, dress: (texture: THREE.Texture) => void) => {
+    let loaded = loading.get(file);
+    if (!loaded) {
+      loaded = new THREE.TextureLoader().loadAsync(ASSETS + file).then((texture) => {
+        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        dress(texture);
+        if (life.disposed) texture.dispose();
+        else life.add(() => texture.dispose());
+        return texture;
+      });
+      loaded.catch(() => loading.delete(file));
+      loading.set(file, loaded);
+    }
+    return loaded;
+  };
+}
+
+type LoadTexture = ReturnType<typeof textureLoader>;
+
+function lightmapLoader(load: LoadTexture) {
+  const lightmap = (tag: LightmapTag): Promise<LoadedLightmap> => {
     const entry = LIGHTMAPS[tag];
-    return (loading[tag] ??= new THREE.TextureLoader().loadAsync(ASSETS + entry.file).then(
-      (light) => {
-        light.flipY = false;
-        light.channel = 1;
-        light.anisotropy = renderer.capabilities.getMaxAnisotropy();
-        light.colorSpace = lightmapColorSpace(entry.encoding);
-        if (life.disposed) light.dispose();
-        else life.add(() => light.dispose());
-        return { texture: light, scale: entry.scale };
-      },
-      (error) => {
-        delete loading[tag];
-        throw error;
-      },
-    ));
+    return load(entry.file, (light) => {
+      light.flipY = false;
+      light.channel = 1;
+      light.colorSpace = lightmapColorSpace(entry.encoding);
+    }).then((texture) => ({ texture, scale: entry.scale }));
   };
-  return (which: Lighting): Promise<LightMaps> => {
-    const [own, ambient] = lightmapsFor(which).map(lightmap);
+  return (light: CabinLight): Promise<LightMaps> => {
+    const { own, layers } = lightmapsFor(light);
     return Promise.all([
+      lightmap(own),
+      ...layers.map((layer) =>
+        lightmap(layer).catch((error) => {
+          console.error(`The Cabin could not load its ${layer} light; it is drawn without it.`, error);
+          return undefined;
+        }),
+      ),
+    ]).then(([own, ...loaded]) => ({
       own,
-      ambient?.catch((error) => {
-        console.error('The Cabin could not load its ambient light; the night is drawn without it.', error);
-        return undefined;
-      }),
-    ]).then(([own, ambient]) => ({ own, ambient }));
+      layers: Object.fromEntries(layers.flatMap((layer, at) => (loaded[at] ? [[layer, loaded[at]]] : []))),
+    }));
   };
 }
 
-type Glow = { material: THREE.MeshStandardMaterial; level: 'ambientGlow' | 'dome' };
+type Glow = { material: THREE.MeshStandardMaterial; level: 'ambientGlow' | 'domeGlow'; on?: 'domeLights' };
 
 function cabinLighting(
   lit: THREE.MeshStandardMaterial[],
@@ -552,16 +595,26 @@ function cabinLighting(
   street: Street,
   pmrem: THREE.PMREMGenerator,
   life: Life,
-  onLit: (lighting: Lighting) => void,
+  onLit: (light: CabinLight) => void,
 ) {
   const noLight = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
   noLight.needsUpdate = true;
   life.add(() => noLight.dispose());
-  const ambient: AmbientLayer = {
-    cabinAmbientMap: { value: noLight },
-    cabinAmbientLight: { value: new THREE.Color(0, 0, 0) },
-  };
-  const shade = (shader: ShaderParts) => cabinLight(shader, ambient);
+  const layers = LAYERS.map((layer) => ({
+    layer,
+    map: { value: noLight as THREE.Texture },
+    light: { value: new THREE.Color(0, 0, 0) },
+  }));
+  const uniforms: LayerUniforms = Object.fromEntries(
+    layers.flatMap(({ layer, map, light }) => {
+      const names = layerUniforms(layer);
+      return [
+        [names.map, map],
+        [names.light, light],
+      ];
+    }),
+  );
+  const shade = (shader: ShaderParts) => cabinLight(shader, uniforms);
   const glows: Glow[] = [];
   for (const material of lit) {
     material.onBeforeCompile = shade;
@@ -571,29 +624,37 @@ function cabinLighting(
       glows.push({ material, level: 'ambientGlow' });
     } else if (material.name === 'dome') {
       material.emissive.set(DOME_GLOW);
-      glows.push({ material, level: 'dome' });
+      glows.push({ material, level: 'domeGlow', on: 'domeLights' });
     }
   }
   let reflection: THREE.WebGLRenderTarget | null = null;
   life.add(() => reflection?.dispose());
 
-  const light = (which: Lighting, maps: LightMaps) => {
-    const look = LOOKS[which];
+  let litStreet: Lighting | null = null;
+  const light = (which: CabinLight, maps: LightMaps) => {
+    const look = LOOKS[which.lighting];
     const strength = ({ scale }: LoadedLightmap) => look.light * scale * Math.PI;
-    street.setLighting(which);
-    reflection?.dispose();
-    reflection = pmrem.fromScene(street.scene, 0.04, 0.1, FAR, { position: REFLECTION_EYE });
-    cabinScene.environment = reflection.texture;
-    cabinScene.environmentIntensity = look.reflection;
+    if (litStreet !== which.lighting) {
+      litStreet = which.lighting;
+      street.setLighting(which.lighting);
+      reflection?.dispose();
+      reflection = pmrem.fromScene(street.scene, 0.04, 0.1, FAR, { position: REFLECTION_EYE });
+      cabinScene.environment = reflection.texture;
+      cabinScene.environmentIntensity = look.reflection;
+    }
     for (const material of lit) {
       material.lightMap = maps.own.texture;
       material.lightMapIntensity = strength(maps.own);
     }
-    ambient.cabinAmbientMap.value = maps.ambient?.texture ?? noLight;
-    ambient.cabinAmbientLight.value
-      .set(AMBIENT_COLOUR)
-      .multiplyScalar(maps.ambient ? look.ambient * strength(maps.ambient) : 0);
-    for (const { material, level } of glows) material.emissiveIntensity = look[level];
+    for (const { layer, map, light } of layers) {
+      const loaded = maps.layers[layer];
+      const { colour, strength: level } = LAYER_LIGHTS[layer];
+      map.value = loaded?.texture ?? noLight;
+      light.value.set(colour).multiplyScalar(loaded ? look[level] * strength(loaded) : 0);
+    }
+    for (const { material, level, on } of glows) {
+      material.emissiveIntensity = on && !which[on] ? 0 : look[level];
+    }
     onLit(which);
   };
   return { shade, light };
@@ -602,25 +663,14 @@ function cabinLighting(
 function surfaceTiles(
   lit: THREE.MeshStandardMaterial[],
   shade: (shader: ShaderParts) => void,
-  renderer: THREE.WebGLRenderer,
+  load: LoadTexture,
   life: Life,
 ) {
-  const tiles = new Map<string, Promise<THREE.Texture>>();
-  const tile = (file: string) => {
-    let loaded = tiles.get(file);
-    if (!loaded) {
-      loaded = new THREE.TextureLoader().loadAsync(ASSETS + file).then((texture) => {
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-        if (life.disposed) texture.dispose();
-        else life.add(() => texture.dispose());
-        return texture;
-      });
-      tiles.set(file, loaded);
-    }
-    return loaded;
-  };
+  const tile = (file: string) =>
+    load(file, (texture) => {
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    });
   const textures: Record<string, SurfaceTextureEntry & { file: string }> = manifest.textures;
   for (const [name, kind] of Object.entries(manifest.surfaces as Record<string, string>)) {
     const entry = textures[kind];
@@ -766,6 +816,7 @@ function cabinInput(
   canvas: HTMLCanvasElement,
   view: THREE.Camera,
   screen: THREE.Mesh,
+  domes: THREE.Mesh[],
   zones: () => Zone[],
   zoomed: () => boolean,
   on: {
@@ -773,6 +824,7 @@ function cabinInput(
     hover: (key: string | null) => void;
     navigate: (href: string) => void;
     press: (tab: HomeSectionId | null) => void;
+    pressDome: () => void;
   },
   life: Life,
 ) {
@@ -784,6 +836,7 @@ function cabinInput(
 
   const ray = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
+  const pressable = [screen, ...domes];
   const pointAt = (event: PointerEvent): { press: PressPoint; zone: Zone | null } => {
     const bounds = canvas.getBoundingClientRect();
     pointer.set(
@@ -791,9 +844,11 @@ function cabinInput(
       -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
     );
     ray.setFromCamera(pointer, view);
-    const uv = ray.intersectObject(screen, false)[0]?.uv;
+    const hit = ray.intersectObjects(pressable, false)[0];
+    const on: Pressable | null = !hit ? null : hit.object === screen ? 'screen' : 'dome';
+    const uv = on === 'screen' ? hit.uv : undefined;
     return {
-      press: { x: event.clientX, y: event.clientY, at: performance.now(), onScreen: uv !== undefined },
+      press: { x: event.clientX, y: event.clientY, at: performance.now(), on },
       zone: uv ? zoneAt(zones(), uv.x * SCREEN_WIDTH, uv.y * SCREEN_HEIGHT) : null,
     };
   };
@@ -807,6 +862,10 @@ function cabinInput(
     if (!start) return;
     const { press, zone } = pointAt(event);
     if (!isTap({ start, end: press })) return;
+    if (press.on === 'dome') {
+      on.pressDome();
+      return;
+    }
     if (zone?.kind === 'item') {
       if (zone.href.startsWith('/')) on.navigate(zone.href);
       else window.open(zone.href, '_blank', 'noopener,noreferrer');
@@ -821,7 +880,8 @@ function cabinInput(
     if (pressed) return;
     const { press, zone } = pointAt(event);
     on.hover(zone?.key ?? null);
-    canvas.style.cursor = zone || (press.onScreen && !zoomed()) ? 'pointer' : zoomed() ? 'auto' : 'grab';
+    canvas.style.cursor =
+      zone || press.on === 'dome' || (press.on === 'screen' && !zoomed()) ? 'pointer' : zoomed() ? 'auto' : 'grab';
   };
   const leave = () => on.hover(null);
   canvas.addEventListener('pointerdown', down);
@@ -892,15 +952,31 @@ function cabinProbe(
   parts: {
     renderer: THREE.WebGLRenderer;
     seat: ReturnType<typeof cabinCamera>;
+    domes: THREE.Mesh[];
     zones: () => Zone[];
     tab: () => HomeSectionId;
-    lighting: () => Lighting;
+    light: () => CabinLight;
   },
   paintCost: () => number,
 ): () => CabinProbe {
   const { renderer, seat, zones } = parts;
   const { view, target, controls, screenBox } = seat;
   const canvas = renderer.domElement;
+  const toPage = (at: THREE.Vector3) => {
+    const bounds = canvas.getBoundingClientRect();
+    const seen = at.project(view);
+    return { x: bounds.left + ((seen.x + 1) / 2) * bounds.width, y: bounds.top + ((1 - seen.y) / 2) * bounds.height };
+  };
+  const lenses = parts.domes.flatMap((mesh) => {
+    const position = mesh.geometry.getAttribute('position');
+    const sides = [new THREE.Box3(), new THREE.Box3()];
+    const point = new THREE.Vector3();
+    for (let i = 0; i < position.count; i++) {
+      point.fromBufferAttribute(position, i).applyMatrix4(mesh.matrixWorld);
+      sides[point.x < 0 ? 0 : 1].expandByPoint(point);
+    }
+    return sides.filter((box) => !box.isEmpty()).map((box) => box.getCenter(new THREE.Vector3()).setY(box.min.y));
+  });
   return () => ({
     gap: view.position.distanceTo(seat.camera.position),
     distance: view.position.distanceTo(target),
@@ -909,22 +985,18 @@ function cabinProbe(
     zoomed: seat.zoomed(),
     pixelRatio: renderer.getPixelRatio(),
     tab: parts.tab(),
-    lighting: parts.lighting(),
+    ...parts.light(),
     paintCost: paintCost(),
     zones: zones().map((zone) => {
-      const bounds = canvas.getBoundingClientRect();
       const size = screenBox.getSize(new THREE.Vector3());
       const at = new THREE.Vector3(
         screenBox.min.x + (((zone.x0 + zone.x1) / 2) / SCREEN_WIDTH) * size.x,
         screenBox.max.y - (((zone.y0 + zone.y1) / 2) / SCREEN_HEIGHT) * size.y,
         (screenBox.min.z + screenBox.max.z) / 2,
-      ).project(view);
-      return {
-        key: zone.key,
-        x: bounds.left + ((at.x + 1) / 2) * bounds.width,
-        y: bounds.top + ((1 - at.y) / 2) * bounds.height,
-      };
+      );
+      return { key: zone.key, ...toPage(at) };
     }),
+    lenses: lenses.map((lens) => toPage(lens.clone())),
   });
 }
 
@@ -932,12 +1004,12 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
   let disposed = false;
   let stop = () => {};
   let zoomOut = () => {};
-  let lighting = from.lighting;
+  let light: CabinLight = { lighting: from.lighting, domeLights: from.domeLights };
   let language = from.language;
   let tab: HomeSectionId = from.tab ?? 'about';
   let ready = false;
   let zoomAsked = from.tab !== null;
-  const show = { lighting: () => {}, language: () => {}, tab: () => {} };
+  const show = { light: () => {}, language: () => {}, tab: () => {} };
   let probe: (() => CabinProbe) | undefined;
 
   const fail = (error: unknown) => {
@@ -1016,8 +1088,9 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
     const draco = new DRACOLoader().setDecoderPath(DRACO_GLTF_CONFIG);
     life.add(() => draco.dispose());
 
-    const lightmapsOf = lightmapLoader(renderer, life);
-    const first = lighting;
+    const loadTexture = textureLoader(renderer, life);
+    const lightmapsOf = lightmapLoader(loadTexture);
+    const first = light;
     Promise.all([
       new GLTFLoader().setDRACOLoader(draco).loadAsync(ASSETS + manifest.geometry),
       lightmapsOf(first),
@@ -1031,35 +1104,35 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
       })
       .catch(fail);
 
-    function run(cabin: THREE.Object3D, firstLighting: Lighting, firstLight: LightMaps) {
-      let drawnLighting = firstLighting;
+    function run(cabin: THREE.Object3D, firstLight: CabinLight, firstMaps: LightMaps) {
+      let drawn = firstLight;
       let hover: string | null = null;
       let paintCost = 0;
       const screen = cabinScreen(
         renderer,
         from.fontFamily,
-        () => ({ tab, language, lighting: drawnLighting, hover }),
+        () => ({ tab, language, lighting: drawn.lighting, hover }),
         life,
         process.env.NODE_ENV !== 'production' ? (ms) => (paintCost = ms) : undefined,
       );
 
       const dressed = dressCabin(cabin, screen.texture);
       const lights = cabinLighting(dressed.lit, cabinScene, street, pmrem, life, (which) => {
-        drawnLighting = which;
+        drawn = which;
         screen.paint();
       });
       cabinScene.add(cabin);
-      surfaceTiles(dressed.lit, lights.shade, renderer, life);
-      lights.light(firstLighting, firstLight);
-      show.lighting = () => {
-        const asked = lighting;
+      surfaceTiles(dressed.lit, lights.shade, loadTexture, life);
+      lights.light(firstLight, firstMaps);
+      show.light = () => {
+        const asked = light;
         lightmapsOf(asked)
           .then((maps) => {
-            if (!disposed && lighting === asked && drawnLighting !== asked) lights.light(asked, maps);
+            if (!disposed && light === asked && drawn !== asked) lights.light(asked, maps);
           })
           .catch((error) => console.error('The Cabin could not load its lightmap.', error));
       };
-      show.lighting();
+      show.light();
       show.language = screen.paint;
 
       let reported: CabinView | null = null;
@@ -1084,6 +1157,7 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
         canvas,
         seat.view,
         dressed.screen,
+        dressed.domes,
         screen.zones,
         seat.zoomed,
         {
@@ -1097,6 +1171,11 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
           press: (pressed) => {
             if (pressed) tab = pressed;
             show.tab();
+          },
+          pressDome: () => {
+            light = { ...light, domeLights: !light.domeLights };
+            events.onDomeLights(light.domeLights);
+            show.light();
           },
         },
         life,
@@ -1136,7 +1215,7 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
 
       if (process.env.NODE_ENV !== 'production') {
         probe = cabinProbe(
-          { renderer, seat, zones: screen.zones, tab: () => tab, lighting: () => drawnLighting },
+          { renderer, seat, domes: dressed.domes, zones: screen.zones, tab: () => tab, light: () => drawn },
           () => paintCost,
         );
       }
@@ -1151,8 +1230,14 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
       show.tab();
     },
     setLighting: (next) => {
-      lighting = next;
-      show.lighting();
+      if (light.lighting === next) return;
+      light = { ...light, lighting: next };
+      show.light();
+    },
+    setDomeLights: (on) => {
+      if (light.domeLights === on) return;
+      light = { ...light, domeLights: on };
+      show.light();
     },
     setLanguage: (next) => {
       language = next;
@@ -1174,9 +1259,10 @@ export function mountCabin(container: HTMLElement, events: CabinEvents, from: Ca
         zoomed: false,
         pixelRatio: 0,
         tab,
-        lighting,
+        ...light,
         paintCost: 0,
         zones: [],
+        lenses: [],
       };
   }
   return cabin;

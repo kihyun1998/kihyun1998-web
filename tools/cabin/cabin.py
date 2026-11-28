@@ -825,22 +825,26 @@ def bake(tag):
         for n in [n for n in m.node_tree.nodes if n.type in ('TEX_IMAGE', 'UVMAP')]: m.node_tree.nodes.remove(n)
 
 AMBIENT = {'foot': 3.0, 'bar': 10.0, 'strip': 6.0}
+DOME = 1.5
 def emission(k, strength): M[k].node_tree.nodes['Principled BSDF'].inputs['Emission Strength'].default_value = strength
 
 bake('day')
 bg.inputs['Color'].default_value = (0.25, 0.35, 0.6, 1); bg.inputs['Strength'].default_value = 0.05; sun.hide_render = True
-emission('dome', 1.5)
 lamp = bpy.data.objects.new('street', bpy.data.lights.new('street', 'AREA')); sc.collection.objects.link(lamp)
 lamp.data.energy = 120; lamp.data.size = 1.0; lamp.data.color = (1.0, 0.75, 0.45); lamp.location = (3.0, 0.6, 4.0)
 lamp.rotation_euler = (Vector((0, SEAT_Y + 0.3, 0.8)) - lamp.location).to_track_quat('-Z', 'Y').to_euler()
 bake('night')
-bg.inputs['Strength'].default_value = 0.0; emission('dome', 0); lamp.hide_render = True
+bg.inputs['Strength'].default_value = 0.0; lamp.hide_render = True
 emission('strip', AMBIENT['strip']); emission('ambient', AMBIENT['bar'])
 foot = bpy.data.objects.new('footLight', bpy.data.lights.new('footLight', 'AREA')); sc.collection.objects.link(foot)
 foot.data.shape = 'RECTANGLE'; foot.data.size = 2 * (SLAB_X - 0.12); foot.data.size_y = 0.012; foot.data.energy = AMBIENT['foot']
 foot.location = (0, DASH_Y + 0.03, DASH_LOW - 0.006); foot.rotation_euler = (math.radians(-20), 0, 0)
 bake('ambient')
 for k in ('strip', 'ambient'): emission(k, 0)
+foot.hide_render = True
+M['dome'].node_tree.nodes['Principled BSDF'].inputs['Emission Color'].default_value = (1, 1, 1, 1); emission('dome', DOME)
+bake('dome')
+emission('dome', 0)
 
 seat_backs = []
 for name in SEAT_BACK_PARTS:

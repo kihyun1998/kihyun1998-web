@@ -50,7 +50,7 @@ def geometry():
     return publish(tmp, 'cabin', 'glb')
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
-manifest = {'lightmaps': {tag: lightmap(tag) for tag in ('day', 'night', 'ambient')}}
+manifest = {'lightmaps': {tag: lightmap(tag) for tag in ('day', 'night', 'ambient', 'dome')}}
 with open(os.path.join(SRC, 'textures.json')) as f: textures = json.load(f)
 manifest['textures'] = {kind: texture(kind, tile) for kind, tile in textures['kinds'].items()}
 manifest['surfaces'] = textures['materials']

@@ -58,11 +58,14 @@ python3 tools/cabin/bake_kaggle.py 1024 64    # a quick look
 ```
 
 Pushes `cabin.py` to the private GPU kernel `kihyun1998/cabin-bake` (`KERNEL` in `bake_kaggle.py`), waits for the run, and
-downloads `cabin.glb`, `light_day.hdr`, `light_night.hdr`, `light_ambient.hdr`, the ten views as Cycles day renders (`day_home.png` and
+downloads `cabin.glb`, `light_day.hdr`, `light_night.hdr`, `light_ambient.hdr`, `light_dome.hdr`, the ten views as Cycles day renders (`day_home.png` and
 so on) and the run log into `out/`, and removes the denoised lightmaps of the bake before. Each HDR holds the baked
 light as Cycles computed it, linear, with no colour curve. `light_ambient.hdr` is the night's ambient layer alone: the
 footwell light under the dash, the door bars and the dash strip, baked in white with every other light off, which the
-page multiplies by the ambient colour and strength and adds to the night lightmap. All three lightmaps use the Cabin's second UV set; the **Cabin Screen** is a separate object
+page multiplies by the ambient colour and strength and adds to the night lightmap. `light_dome.hdr` is the dome lights
+alone, their lenses baked in white with every other light off, which the page multiplies by the dome lights' colour and
+strength and adds to the day or the night lightmap while the visitor has the dome lights on; the night lightmap leaves
+them out. All four lightmaps use the Cabin's second UV set; the **Cabin Screen** is a separate object
 named `Screen` and is not baked, and the side glass is a separate object named `Glass`, left out of the bake and exported
 with a see-through material. Each seat's back, headrest and headrest posts are baked as part of the Cabin and then split
 off it into `SeatBackLeft` and `SeatBackRight`, which keep the Cabin's lightmap UVs and read the same lightmaps.
@@ -80,7 +83,7 @@ run, printing `FAIL` with both hashes and removing the tarball, unless the tarba
 on a match it prints `BLENDER_SHA256` and the hash.
 
 The kernel runs `cabin.py -- bake [size] [samples]` (2048 and 256 by default). The same command bakes on this machine,
-on the first of OptiX, CUDA or Metal that Blender finds, and writes the ten Cycles day renders, the three lightmaps and
+on the first of OptiX, CUDA or Metal that Blender finds, and writes the ten Cycles day renders, the four lightmaps and
 `cabin.glb` into `out/`.
 
 ## 4. Denoise
@@ -90,7 +93,7 @@ $BLENDER -b --factory-startup --python tools/cabin/denoise.py
 ```
 
 Denoises the lightmaps with OIDN through Blender's compositor, on the CPU, without Cycles, and writes
-`out/light_day_dn.hdr`, `out/light_night_dn.hdr` and `out/light_ambient_dn.hdr`. Given `-- <in.hdr> <out.hdr> ...`, it
+`out/light_day_dn.hdr`, `out/light_night_dn.hdr`, `out/light_ambient_dn.hdr` and `out/light_dome_dn.hdr`. Given `-- <in.hdr> <out.hdr> ...`, it
 denoises those pairs instead.
 
 ## 5. Make the surface textures
@@ -112,15 +115,17 @@ run needs the network. A few seconds; the tiles do not depend on the bake. Why t
 $BLENDER -b --factory-startup --python tools/cabin/compress.py [-- <lightmap quality> [<texture quality>]]
 ```
 
-Reads `cabin.glb`, the three denoised lightmaps and the surface tiles from `out/`, and replaces the files in
+Reads `cabin.glb`, the four denoised lightmaps and the surface tiles from `out/`, and replaces the files in
 `public/cabin/`, removing each file's earlier version:
 
 - `cabin.<hash>.glb`: the scene with Draco mesh compression. The page needs three.js's `DRACOLoader`.
-- `light-day.<hash>.avif`, `light-night.<hash>.avif`, `light-ambient.<hash>.avif`: each lightmap's linear light divided by `scale`, with the sRGB
+- `light-day.<hash>.avif`, `light-night.<hash>.avif`, `light-ambient.<hash>.avif`, `light-dome.<hash>.avif`: each lightmap's linear light divided by `scale`, with the sRGB
   curve applied three times, in 8 bits (the manifest's `encoding`, `srgb-thrice`), as AVIF at quality 90. The page loads it as an sRGB texture
   with `flipY = false` on UV channel 1, decodes the sampled value from sRGB twice more in the shader, and multiplies
   the lightmap intensity by `scale`. At night it adds the ambient layer, decoded the same way, times its `scale`, the
-  night's level, the ambient strength and the ambient colour (`AMBIENT_COLOUR` in `src/lib/cabin-scene.ts`). Why three times: `docs/map/home-room.md`, "The lightmaps hold linear light"; why AVIF: "The lightmap goes to what the seat sees".
+  night's level, the ambient strength and the ambient colour (`AMBIENT_COLOUR` in `src/lib/cabin-scene.ts`); while the
+  dome lights are on, by day or by night, it adds the dome layer the same way, times the lighting's level, the dome
+  strength and the dome colour (`DOME_GLOW`). Why three times: `docs/map/home-room.md`, "The lightmaps hold linear light"; why AVIF: "The lightmap goes to what the seat sees".
 - `tex-<kind>.<hash>.avif`: each surface tile, as AVIF at quality 80. The page loads it as an sRGB texture and draws it
   projected along the three world axes, `1 / tile` tiles to a metre (the GLB has no texture UVs), on the materials
   `surfaces` names, their base colour divided by the tile's `mean`.
@@ -139,7 +144,7 @@ python3 tools/cabin/verify.py [directory]
 Checks the assets in `directory` (`public/cabin/` by default), and exits non-zero listing every failure. It checks
 that every file there is the one the manifest names, that each name matches its content, that
 the GLB is Draco-compressed with a `Cabin` mesh and `SeatBackLeft` and `SeatBackRight` meshes carrying lightmap UVs
-and a separate `Screen` mesh, that the lightmaps are day, night and the ambient layer, all
+and a separate `Screen` mesh, that the lightmaps are day, night, the ambient layer and the dome layer, all
 AVIF of the same size, with `srgb-thrice` named as each one's encoding in the manifest, and that each surface
 tile is AVIF with a positive tile size and a mean in (0, 1], is used by some surface, and that every surface is a
 material of the GLB and names a listed tile. Then commit `tools/cabin/` and `public/cabin/` together.

@@ -1,14 +1,16 @@
 export const TAP_MAX_MOVE_PX = 5;
 export const TAP_MAX_HOLD_MS = 400;
 
-export type PressPoint = { x: number; y: number; at: number; onScreen: boolean };
+export type Pressable = 'screen' | 'dome';
+
+export type PressPoint = { x: number; y: number; at: number; on: Pressable | null };
 
 export type Press = { start: PressPoint; end: PressPoint };
 
 export function isTap({ start, end }: Press): boolean {
   return (
-    start.onScreen &&
-    end.onScreen &&
+    start.on !== null &&
+    start.on === end.on &&
     Math.hypot(end.x - start.x, end.y - start.y) <= TAP_MAX_MOVE_PX &&
     end.at - start.at <= TAP_MAX_HOLD_MS
   );
@@ -119,10 +121,19 @@ export function lightmapColorSpace(encoding: string | undefined): 'srgb' {
   throw new Error(`The Cabin does not know the lightmap encoding ${JSON.stringify(encoding)}.`);
 }
 
-export type LightmapTag = Lighting | 'ambient';
+export const LAYERS = ['ambient', 'dome'] as const;
 
-export function lightmapsFor(lighting: Lighting): LightmapTag[] {
-  return lighting === 'night' ? ['night', 'ambient'] : [lighting];
+export type Layer = (typeof LAYERS)[number];
+
+export type LightmapTag = Lighting | Layer;
+
+export type CabinLight = { lighting: Lighting; domeLights: boolean };
+
+export function lightmapsFor({ lighting, domeLights }: CabinLight): { own: Lighting; layers: Layer[] } {
+  const layers: Layer[] = [];
+  if (lighting === 'night') layers.push('ambient');
+  if (domeLights) layers.push('dome');
+  return { own: lighting, layers };
 }
 
 export type SurfaceTextureEntry = { tile: number; mean: number };

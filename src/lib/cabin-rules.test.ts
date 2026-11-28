@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import manifest from '../../public/cabin/manifest.json';
 import {
+  LAYERS,
   ORBIT_MARGIN,
   fitOrbit,
   fovFor,
@@ -17,8 +18,8 @@ import {
 } from './cabin-rules';
 
 const press: Press = {
-  start: { x: 100, y: 100, at: 1000, onScreen: true },
-  end: { x: 100, y: 100, at: 1100, onScreen: true },
+  start: { x: 100, y: 100, at: 1000, on: 'screen' },
+  end: { x: 100, y: 100, at: 1100, on: 'screen' },
 };
 
 const ending = (end: Partial<Press['end']>): Press => ({
@@ -31,23 +32,33 @@ describe('isTap', () => {
     expect(isTap(press)).toBe(true);
   });
 
+  it('counts a quick, still press on a dome lens as a tap', () => {
+    expect(isTap({ start: { ...press.start, on: 'dome' }, end: { ...press.end, on: 'dome' } })).toBe(true);
+  });
+
   it('rejects a drag that ends on the Cabin Screen but started off it', () => {
-    expect(isTap({ ...press, start: { ...press.start, onScreen: false } })).toBe(
-      false,
-    );
+    expect(isTap({ ...press, start: { ...press.start, on: null } })).toBe(false);
   });
 
   it('rejects a press that starts on the Cabin Screen and ends off it', () => {
-    expect(isTap(ending({ onScreen: false }))).toBe(false);
+    expect(isTap(ending({ on: null }))).toBe(false);
   });
 
-  it('rejects a press that is on the Cabin Screen at neither end', () => {
+  it('rejects a press that is on nothing pressable at either end', () => {
     expect(
       isTap({
-        start: { ...press.start, onScreen: false },
-        end: { ...press.end, onScreen: false },
+        start: { ...press.start, on: null },
+        end: { ...press.end, on: null },
       }),
     ).toBe(false);
+  });
+
+  it('rejects a press that starts on a dome lens and ends on the Cabin Screen', () => {
+    expect(isTap({ ...press, start: { ...press.start, on: 'dome' } })).toBe(false);
+  });
+
+  it('rejects a press that starts on the Cabin Screen and ends on a dome lens', () => {
+    expect(isTap(ending({ on: 'dome' }))).toBe(false);
   });
 
   it('allows the pointer to move exactly 5 px in a straight line, on neither axis alone', () => {
@@ -419,16 +430,35 @@ describe('lightmapColorSpace', () => {
 });
 
 describe('lightmapsFor', () => {
-  it('draws the day with the day lightmap alone', () => {
-    expect(lightmapsFor('day')).toEqual(['day']);
+  it('draws the day with the day lightmap alone while the dome lights are off', () => {
+    expect(lightmapsFor({ lighting: 'day', domeLights: false })).toEqual({ own: 'day', layers: [] });
   });
 
-  it('draws the night with the night lightmap and the ambient layer added to it', () => {
-    expect(lightmapsFor('night')).toEqual(['night', 'ambient']);
+  it('draws the night with the night lightmap and the ambient layer while the dome lights are off', () => {
+    expect(lightmapsFor({ lighting: 'night', domeLights: false })).toEqual({ own: 'night', layers: ['ambient'] });
   });
 
-  it('reads a committed manifest that lists day, night and the ambient layer', () => {
-    expect(Object.keys(manifest.lightmaps).sort()).toEqual(['ambient', 'day', 'night']);
+  it('adds the dome layer to the day while the dome lights are on', () => {
+    expect(lightmapsFor({ lighting: 'day', domeLights: true })).toEqual({ own: 'day', layers: ['dome'] });
+  });
+
+  it('adds the dome layer to the night, beside the ambient layer, while the dome lights are on', () => {
+    expect(lightmapsFor({ lighting: 'night', domeLights: true })).toEqual({
+      own: 'night',
+      layers: ['ambient', 'dome'],
+    });
+  });
+
+  it('names only layers the page knows', () => {
+    for (const lighting of ['day', 'night'] as const) {
+      for (const domeLights of [false, true]) {
+        for (const layer of lightmapsFor({ lighting, domeLights }).layers) expect(LAYERS).toContain(layer);
+      }
+    }
+  });
+
+  it('reads a committed manifest that lists day, night, the ambient layer and the dome layer', () => {
+    expect(Object.keys(manifest.lightmaps).sort()).toEqual(['ambient', 'day', 'dome', 'night']);
   });
 });
 

@@ -1,19 +1,24 @@
 {
-  "geometry": "cabin.a06ddcfe.glb",
+  "geometry": "cabin.4fff1ff5.glb",
   "lightmaps": {
     "day": {
-      "file": "light-day.97af4805.avif",
-      "scale": 2.75,
+      "file": "light-day.b8c011b3.avif",
+      "scale": 3.25,
       "encoding": "srgb-thrice"
     },
     "night": {
-      "file": "light-night.821af855.avif",
-      "scale": 3.0,
+      "file": "light-night.72426ad3.avif",
+      "scale": 1.75,
       "encoding": "srgb-thrice"
     },
     "ambient": {
-      "file": "light-ambient.f219f83f.avif",
-      "scale": 16.5,
+      "file": "light-ambient.41a151d5.avif",
+      "scale": 16.75,
+      "encoding": "srgb-thrice"
+    },
+    "dome": {
+      "file": "light-dome.77728162.avif",
+      "scale": 3.0,
       "encoding": "srgb-thrice"
     }
   },
