@@ -57,9 +57,9 @@ describe('the home sections', () => {
       'blog',
       'online',
     ]);
-    for (const { id, title } of HOME_SECTIONS) {
-      if (id !== 'about') expect(screenContent(id, 'en').title).toBe(title);
-    }
+    expect(
+      (['open-source', 'projects', 'blog', 'online'] as const).map((id) => screenContent(id, 'en').title),
+    ).toEqual(['Open Source', 'Projects', 'Blog', 'Online']);
   });
 
   it('are not found from an empty or unknown hash', () => {

@@ -89,6 +89,19 @@ export function fitOrbit(bounds: Bounds, target: Point, margin = ORBIT_MARGIN): 
   };
 }
 
+export function orbitAnglesAt(
+  target: Point,
+  radius: number,
+  at: { x: number; y: number },
+): { azimuth: number; polar: number } {
+  const up = (at.y - target.y) / radius;
+  if (!(Math.abs(up) <= 1)) throw new RangeError(`The orbit does not reach the height ${at.y}.`);
+  const polar = Math.acos(up);
+  const across = (at.x - target.x) / (radius * Math.sin(polar));
+  if (!(Math.abs(across) <= 1)) throw new RangeError(`The orbit does not reach x ${at.x} at the height ${at.y}.`);
+  return { azimuth: Math.asin(across), polar };
+}
+
 export function isNear(bounds: Bounds, point: Point, reach: number): boolean {
   const gap = (axis: keyof Point) =>
     Math.max(bounds.min[axis] - point[axis], 0, point[axis] - bounds.max[axis]);

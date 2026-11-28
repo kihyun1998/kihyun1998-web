@@ -30,7 +30,7 @@ What every page shares: the root layout (`src/app/layout.tsx`), the header and i
 
 ## The home page's sections
 
-- **`HOME_SECTIONS` lists the home page's sections in nav and tab order**, as the nav entries, the Reading Home and the Cabin Screen's tabs name them; each `id` is that section's element id in the Reading Home. `sectionHref` is the link to one from any page, and `sectionFromHash` reads one back from a URL hash.
+- **`HOME_SECTIONS` lists the home page's sections in nav and tab order**, as the nav entries, the Reading Home and the Cabin Screen's tabs name them (the titles are `sectionTitle`'s; see `home-room.md`, "The scene in parts"); each `id` is that section's element id in the Reading Home. `sectionHref` is the link to one from any page, and `sectionFromHash` reads one back from a URL hash.
 - **Activating a nav entry dispatches `HOME_SECTION_EVENT` (`home-section`) on `window`, the section's id as `detail`**; that is what zooms the Cabin to that tab of the Cabin Screen. On the home page the entry also scrolls the Reading Home to the section; from another page the link's hash does. A press with a modifier key or a button other than the main one opens the link elsewhere and leaves this page as it is.
 - **`shownSection` is the section the Cabin Screen shows while the view is zoomed to it**, and null at the seat and whenever the Cabin is not shown. The Cabin sets it from what its view shows, or null when it goes; the nav entry for it is marked `aria-current`.
 - **The Reading Home (`src/app/page.tsx`) is what the server renders, with the Cabin mounted over it in the browser.** Its Blog and Online sections list what the Cabin Screen's tabs of the same names list.

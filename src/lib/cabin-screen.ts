@@ -1,9 +1,8 @@
 import type { Lighting } from './cabin-rules';
-import { HOME_LIMIT, HOME_SECTIONS, type HomeSectionId } from './home';
+import { HOME_LIMIT, HOME_SECTIONS, homeLinks, sectionTitle, type HomeSectionId } from './home';
 import { identityStatement, type Language } from './i18n';
 import { openSourceLede, openSourceRows, type OpenSourceRow } from './open-source';
 import { projects, projectsLede, type Project } from './projects';
-import { BLOG_URL, GITHUB_URL } from './site';
 
 export const SCREEN_WIDTH = 1600;
 export const SCREEN_HEIGHT = 1200;
@@ -32,7 +31,7 @@ export function screenContent(
       return { title: 'Ki Hyun Park', statement: identityStatement[language], items: [] };
     case 'open-source':
       return {
-        title: 'Open Source',
+        title: sectionTitle(tab),
         lede: openSourceLede,
         items: data.openSource.slice(0, HOME_LIMIT).map((row) => ({
           name: row.name,
@@ -43,7 +42,7 @@ export function screenContent(
       };
     case 'projects':
       return {
-        title: 'Projects',
+        title: sectionTitle(tab),
         lede: projectsLede,
         items: data.projects.slice(0, HOME_LIMIT).map(({ name, href, description }) => ({
           name,
@@ -53,15 +52,8 @@ export function screenContent(
         seeAll: '/projects',
       };
     case 'blog':
-      return { title: 'Blog', items: [{ name: 'blog.kihyun1998.com', href: BLOG_URL }] };
     case 'online':
-      return {
-        title: 'Online',
-        items: [
-          { name: 'GitHub', meta: 'kihyun1998', href: GITHUB_URL },
-          { name: 'Blog', meta: 'blog.kihyun1998.com', href: BLOG_URL },
-        ],
-      };
+      return { title: sectionTitle(tab), items: homeLinks[tab] };
   }
 }
 

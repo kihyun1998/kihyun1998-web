@@ -9,6 +9,7 @@ import {
   isTap,
   lightmapColorSpace,
   lightmapsFor,
+  orbitAnglesAt,
   surfaceTexture,
   type Bounds,
   type Point,
@@ -134,6 +135,14 @@ describe('homeFor', () => {
   );
 });
 
+// Where three.js puts the eye for these angles
+// (Vector3.setFromSphericalCoords).
+const eyeAt = (target: Point, radius: number, azimuth: number, polar: number): Point => ({
+  x: target.x + radius * Math.sin(polar) * Math.sin(azimuth),
+  y: target.y + radius * Math.cos(polar),
+  z: target.z + radius * Math.sin(polar) * Math.cos(azimuth),
+});
+
 describe('fitOrbit', () => {
   const prototypeCabin: Bounds = {
     min: { x: -0.61, y: 0.82, z: -0.6 },
@@ -165,14 +174,6 @@ describe('fitOrbit', () => {
     { name: 'a target in a hall', target: inside, bounds: hall },
     { name: 'a centre above the screen', target: orbitCentre, bounds: eyeBox },
   ];
-
-  // Where three.js puts the eye for these angles
-  // (Vector3.setFromSphericalCoords).
-  const eyeAt = (target: Point, radius: number, azimuth: number, polar: number): Point => ({
-    x: target.x + radius * Math.sin(polar) * Math.sin(azimuth),
-    y: target.y + radius * Math.cos(polar),
-    z: target.z + radius * Math.sin(polar) * Math.cos(azimuth),
-  });
 
   const expectInside = (eye: Point, bounds: Bounds, margin = ORBIT_MARGIN) => {
     for (const axis of ['x', 'y', 'z'] as const) {
@@ -314,6 +315,40 @@ describe('fitOrbit', () => {
     const target = { x: 0, y: 1.01, z: -0.945 };
 
     expect(() => fitOrbit(crawlSpace, target)).toThrow(/floor and ceiling/);
+  });
+});
+
+describe('orbitAnglesAt', () => {
+  const orbitCentre: Point = { x: 0, y: 1.05, z: -0.945 };
+
+  it('finds the opening view the page carried for the eye over the left seat, as hand-computed in #46', () => {
+    const { azimuth, polar } = orbitAnglesAt(orbitCentre, 0.995, { x: -0.375, y: 1.14 });
+
+    expect(azimuth).toBeCloseTo(-0.3881, 4);
+    expect(polar).toBeCloseTo(1.4802, 4);
+  });
+
+  it.each([
+    { name: 'level with the centre, straight behind it', at: { x: 0, y: 1.05 } },
+    { name: 'over the left seat', at: { x: -0.375, y: 1.14 } },
+    { name: 'over the right seat, low', at: { x: 0.375, y: 0.86 } },
+    { name: 'at the orbit top', at: { x: 0, y: 1.05 + 0.995 } },
+  ])('puts the eye at the asked place, behind the centre, $name', ({ at }) => {
+    const { azimuth, polar } = orbitAnglesAt(orbitCentre, 0.995, at);
+    const eye = eyeAt(orbitCentre, 0.995, azimuth, polar);
+
+    expect(eye.x).toBeCloseTo(at.x, 9);
+    expect(eye.y).toBeCloseTo(at.y, 9);
+    expect(eye.z).toBeGreaterThanOrEqual(orbitCentre.z);
+  });
+
+  it.each([
+    { name: 'above the orbit', at: { x: 0, y: 2.1 }, reason: /reach the height 2.1/ },
+    { name: 'under the orbit', at: { x: 0, y: 0 }, reason: /reach the height 0/ },
+    { name: 'wider than the orbit at that height', at: { x: 0.992, y: 1.14 }, reason: /reach x 0.992/ },
+  ])('refuses an eye $name', ({ at, reason }) => {
+    expect(() => orbitAnglesAt(orbitCentre, 0.995, at)).toThrow(RangeError);
+    expect(() => orbitAnglesAt(orbitCentre, 0.995, at)).toThrow(reason);
   });
 });
 
