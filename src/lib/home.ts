@@ -1,4 +1,4 @@
-import { createClientStore } from './client-store';
+import { createValueStore } from './client-store';
 import { BLOG_URL, GITHUB_URL } from './site';
 
 export const HOME_LIMIT = 6;
@@ -41,15 +41,11 @@ export function sectionFromHash(hash: string): HomeSectionId | null {
 
 export const HOME_SECTION_EVENT = 'home-section';
 
-const shownStore = createClientStore();
-let shown: HomeSectionId | null = null;
+const shown = createValueStore<HomeSectionId | null>(null);
 export const shownSection = {
-  subscribe: shownStore.subscribe,
-  get: (): HomeSectionId | null => shown,
+  subscribe: shown.subscribe,
+  get: shown.get,
   set(view: { zoomed: boolean; tab: HomeSectionId } | null) {
-    const next = view?.zoomed ? view.tab : null;
-    if (next === shown) return;
-    shown = next;
-    shownStore.notify();
+    shown.set(view?.zoomed ? view.tab : null);
   },
 };

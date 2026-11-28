@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
+import { DomeLightsToggle } from '@/components/dome-lights-toggle';
 import { HomeNav } from '@/components/home-nav';
 import { LanguageToggle } from '@/components/language';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -21,6 +22,7 @@ export function SiteHeader() {
         <span className="h-4 w-px bg-border" aria-hidden />
         <LanguageToggle />
         <ThemeToggle />
+        <DomeLightsToggle />
       </nav>
     </header>
   );

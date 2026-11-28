@@ -74,8 +74,8 @@ for material, kind in surfaces.items():
     if materials is not None: check(material in materials, f'manifest: surface {material} is no material of {geo_name}')
 
 sizes = {}
-check(set(manifest['lightmaps']) == {'day', 'night', 'ambient'},
-      f'manifest: lightmaps are {sorted(manifest["lightmaps"])}, expected ambient, day and night')
+check(set(manifest['lightmaps']) == {'day', 'night', 'ambient', 'dome'},
+      f'manifest: lightmaps are {sorted(manifest["lightmaps"])}, expected ambient, day, dome and night')
 for tag, entry in manifest['lightmaps'].items():
     name = entry['file']; listed.add(name)
     data = versioned(name, f'light-{tag}', 'avif')

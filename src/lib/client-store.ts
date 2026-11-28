@@ -18,3 +18,24 @@ export function createClientStore(): ClientStore {
     },
   };
 }
+
+export type ValueStore<T> = {
+  subscribe: ClientStore['subscribe'];
+  get: () => T;
+  set: (next: T) => void;
+};
+
+export function createValueStore<T>(initial: T): ValueStore<T> {
+  const store = createClientStore();
+  let value = initial;
+
+  return {
+    subscribe: store.subscribe,
+    get: () => value,
+    set(next) {
+      if (next === value) return;
+      value = next;
+      store.notify();
+    },
+  };
+}

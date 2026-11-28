@@ -18,6 +18,7 @@ import {
 import { homeFor, type Home, type Lighting, type StoredHome } from '@/lib/cabin-rules';
 import type { Cabin as CabinScene } from '@/lib/cabin-scene';
 import { createClientStore } from '@/lib/client-store';
+import { domeLights as domeLightsStore } from '@/lib/dome-lights';
 import { HOME_SECTION_EVENT, sectionFromHash, shownSection } from '@/lib/home';
 import { isDarkNow, themeStore } from '@/lib/theme';
 import { useLanguage } from '@/components/language';
@@ -181,12 +182,14 @@ function CabinStage() {
   const router = useRouter();
   const { language } = useLanguage();
   const lighting = useSyncExternalStore(themeStore.subscribe, lightingNow, lightingNow);
-  const latest = useRef({ language, lighting });
+  const domeLights = useSyncExternalStore(domeLightsStore.subscribe, domeLightsStore.get, unknownOnServer) ?? false;
+  const latest = useRef({ language, lighting, domeLights });
   useEffect(() => {
-    latest.current = { language, lighting };
+    latest.current = { language, lighting, domeLights };
     scene.current?.setLanguage(language);
     scene.current?.setLighting(lighting);
-  }, [language, lighting]);
+    scene.current?.setDomeLights(domeLights);
+  }, [language, lighting, domeLights]);
 
   useEffect(() => {
     let left = false;
@@ -214,6 +217,7 @@ function CabinStage() {
               giveUp();
             },
             onNavigate: (href) => router.push(href),
+            onDomeLights: domeLightsStore.set,
           },
           {
             ...latest.current,
@@ -250,7 +254,11 @@ function CabinStage() {
     if (!ready) return;
     const root = document.documentElement;
     root.setAttribute(HOME_ATTRIBUTE, 'cabin');
-    return () => root.removeAttribute(HOME_ATTRIBUTE);
+    domeLightsStore.set(latest.current.domeLights);
+    return () => {
+      root.removeAttribute(HOME_ATTRIBUTE);
+      domeLightsStore.set(null);
+    };
   }, [ready]);
 
   useEffect(() => {

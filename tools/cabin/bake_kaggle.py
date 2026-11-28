@@ -92,7 +92,7 @@ while True:
     break
 
 print('\n'.join(l for l in lines if l.startswith(('BLENDER_SHA256', 'SETUP_S', 'DEVICE', 'TIME', 'DONE', 'TOTAL_S'))))
-TAGS = ('day', 'night', 'ambient')
+TAGS = ('day', 'night', 'ambient', 'dome')
 missing = [n for n in ('cabin.glb', *(f'light_{tag}.hdr' for tag in TAGS)) if not os.path.isfile(os.path.join(OUT, n))]
 if missing or not any(l.startswith('DONE') for l in lines):
     sys.exit(f'the bake did not finish (missing: {", ".join(missing) or "nothing"}); see the log in {OUT}')
